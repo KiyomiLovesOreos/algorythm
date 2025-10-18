@@ -1,8 +1,8 @@
-# Synthesia (Audionaut) Implementation Summary
+# Algorythm Implementation Summary
 
 ## Overview
 
-This document summarizes the implementation of the Synthesia library, now available as the `audionaut` package. The library follows a Manim-inspired, declarative approach to algorithmic music composition.
+This document summarizes the implementation of the Algorythm library, available as the `algorythm` package. The library follows a Manim-inspired, declarative approach to algorithmic music composition.
 
 ## Implementation Status: ✅ COMPLETE
 
@@ -17,7 +17,7 @@ All requirements from the problem statement have been successfully implemented a
 
 ## Module Implementation
 
-### 1. audionaut.synth ✅
+### 1. algorythm.synth ✅
 Defines sound sources and timbres.
 
 **Implemented Classes:**
@@ -33,7 +33,7 @@ Defines sound sources and timbres.
 - Filter support with resonance
 - Preset instruments for quick use
 
-### 2. audionaut.sequence ✅
+### 2. algorythm.sequence ✅
 Handles rhythmic and melodic patterns.
 
 **Implemented Classes:**
@@ -48,7 +48,7 @@ Handles rhythmic and melodic patterns.
 - Frequency calculation from scale degrees
 - Arpeggio patterns (up, down, up-down, random)
 
-### 3. audionaut.structure ✅
+### 3. algorythm.structure ✅
 Arranges and composes the final track.
 
 **Implemented Classes:**
@@ -66,7 +66,7 @@ Arranges and composes the final track.
 - Tempo and timing management
 - Automatic mixing and normalization
 
-### 4. audionaut.export ✅
+### 4. algorythm.export ✅
 Renders and saves the final audio.
 
 **Implemented Classes:**
@@ -148,18 +148,18 @@ Three comprehensive examples are provided:
 
 All examples can be run via:
 - Direct execution: `python examples/composition_example.py`
-- CLI interface: `python -m audionaut.cli --example composition`
+- CLI interface: `python -m algorythm.cli --example composition`
 
 ## CLI Interface
 
 A command-line interface is provided for easy access:
 
 ```bash
-audionaut --help                    # Show help
-audionaut --version                 # Show version
-audionaut --example basic           # Run basic example
-audionaut --example composition     # Run composition example
-audionaut --example advanced        # Run advanced example
+algorythm --help                    # Show help
+algorythm --version                 # Show version
+algorythm --example basic           # Run basic example
+algorythm --example composition     # Run composition example
+algorythm --example advanced        # Run advanced example
 ```
 
 ## Installation
@@ -205,7 +205,7 @@ pip install -e ".[dev]"
 
 ```
 synthesia/
-├── audionaut/              # Main package
+├── algorythm/              # Main package
 │   ├── __init__.py        # Package initialization
 │   ├── synth.py           # Synthesis module
 │   ├── sequence.py        # Sequencing module
@@ -257,6 +257,6 @@ Potential areas for extension:
 
 ## Conclusion
 
-The Synthesia (Audionaut) library has been successfully implemented with all features from the problem statement. The API is clean, declarative, and follows the Manim-inspired philosophy. All tests pass, security checks are clean, and comprehensive examples demonstrate the library's capabilities.
+The Algorythm library has been successfully implemented with all features from the problem statement. The API is clean, declarative, and follows the Manim-inspired philosophy. All tests pass, security checks are clean, and comprehensive examples demonstrate the library's capabilities.
 
 The implementation is production-ready for algorithmic music composition and can be extended as needed for more advanced features.

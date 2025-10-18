@@ -5,9 +5,9 @@ This example demonstrates more advanced features including multiple tracks,
 different synth presets, and various musical transformations.
 """
 
-from audionaut.synth import SynthPresets
-from audionaut.sequence import Motif, Scale, Arpeggiator
-from audionaut.structure import Composition, Reverb, Delay
+from algorythm.synth import SynthPresets
+from algorythm.sequence import Motif, Scale, Arpeggiator
+from algorythm.structure import Composition, Reverb, Delay
 
 # Create a composition
 composition = Composition(tempo=128)

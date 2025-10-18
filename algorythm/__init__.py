@@ -1,15 +1,15 @@
 """
-Synthesia: A Python Library for Algorithmic Music
+Algorythm: A Python Library for Algorithmic Music
 
 A declarative, Manim-inspired library for generating algorithmic music.
 """
 
 __version__ = '0.1.0'
 
-from audionaut.synth import Synth, Oscillator, Filter, ADSR, SynthPresets
-from audionaut.sequence import Motif, Rhythm, Arpeggiator, Scale
-from audionaut.structure import Track, Composition, EffectChain, Reverb
-from audionaut.export import RenderEngine, Exporter
+from algorythm.synth import Synth, Oscillator, Filter, ADSR, SynthPresets
+from algorythm.sequence import Motif, Rhythm, Arpeggiator, Scale
+from algorythm.structure import Track, Composition, EffectChain, Reverb
+from algorythm.export import RenderEngine, Exporter
 
 __all__ = [
     'Synth',

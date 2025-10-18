@@ -1,6 +1,6 @@
-# Audionaut Examples
+# Algorythm Examples
 
-This directory contains example scripts demonstrating the Audionaut library's features.
+This directory contains example scripts demonstrating the Algorythm library's features.
 
 ## Running Examples
 
@@ -18,16 +18,16 @@ python advanced_example.py
 
 ```bash
 # From the repository root
-python -m audionaut.cli --example basic
-python -m audionaut.cli --example composition
-python -m audionaut.cli --example advanced
+python -m algorythm.cli --example basic
+python -m algorythm.cli --example composition
+python -m algorythm.cli --example advanced
 ```
 
 Or if installed:
 ```bash
-audionaut --example basic
-audionaut --example composition
-audionaut --example advanced
+algorythm --example basic
+algorythm --example composition
+algorythm --example advanced
 ```
 
 ## Example Descriptions

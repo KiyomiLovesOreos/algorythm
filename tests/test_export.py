@@ -1,10 +1,10 @@
-"""Tests for audionaut.export module."""
+"""Tests for algorythm.export module."""
 
 import numpy as np
 import pytest
 import os
 import tempfile
-from audionaut.export import RenderEngine, Exporter
+from algorythm.export import RenderEngine, Exporter
 
 
 class TestRenderEngine:

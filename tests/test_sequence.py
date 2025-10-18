@@ -1,7 +1,7 @@
-"""Tests for audionaut.sequence module."""
+"""Tests for algorythm.sequence module."""
 
 import pytest
-from audionaut.sequence import Scale, Motif, Rhythm, Arpeggiator
+from algorythm.sequence import Scale, Motif, Rhythm, Arpeggiator
 
 
 class TestScale:

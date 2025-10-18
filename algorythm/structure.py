@@ -1,5 +1,5 @@
 """
-audionaut.structure - Arranges and composes the final track
+algorythm.structure - Arranges and composes the final track
 
 This module provides high-level composition tools for arranging tracks,
 applying effects, and creating complete musical pieces.
@@ -7,8 +7,8 @@ applying effects, and creating complete musical pieces.
 
 from typing import List, Optional, Dict, Any
 import numpy as np
-from audionaut.synth import Synth
-from audionaut.sequence import Motif
+from algorythm.synth import Synth
+from algorythm.sequence import Motif
 
 
 class Reverb:
@@ -449,7 +449,7 @@ class Composition:
         
         # Export if file path provided
         if file_path:
-            from audionaut.export import Exporter
+            from algorythm.export import Exporter
             exporter = Exporter()
             
             if formats:
