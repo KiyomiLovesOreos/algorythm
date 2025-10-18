@@ -1,7 +1,7 @@
 """Tests for algorythm.sequence module."""
 
 import pytest
-from algorythm.sequence import Scale, Motif, Rhythm, Arpeggiator
+from algorythm.sequence import Scale, Motif, Rhythm, Arpeggiator, Chord
 
 
 class TestScale:
@@ -116,3 +116,60 @@ class TestArpeggiator:
         result = arp.arpeggiate(motif)
         # Should have more intervals than original
         assert len(result.intervals) > len(motif.intervals)
+
+
+class TestChord:
+    """Tests for Chord class."""
+    
+    def test_chord_creation(self):
+        """Test creating a chord."""
+        chord = Chord.major('C', octave=4)
+        assert chord.root == 'C'
+        assert chord.chord_type == 'major'
+        assert chord.octave == 4
+    
+    def test_chord_types(self):
+        """Test different chord types."""
+        chords = [
+            Chord.major('C'),
+            Chord.minor('A'),
+            Chord.major7('G'),
+            Chord.minor7('D'),
+            Chord.dominant7('E'),
+        ]
+        for chord in chords:
+            assert chord.root in Scale.NOTE_NAMES
+    
+    def test_chord_get_notes(self):
+        """Test getting MIDI notes from chord."""
+        chord = Chord.major('C', octave=4)
+        notes = chord.get_notes()
+        
+        # Major chord should have 3 notes
+        assert len(notes) == 3
+        assert all(isinstance(n, int) for n in notes)
+    
+    def test_chord_get_frequencies(self):
+        """Test getting frequencies from chord."""
+        chord = Chord.major('C', octave=4)
+        freqs = chord.get_frequencies()
+        
+        assert len(freqs) == 3
+        assert all(isinstance(f, float) for f in freqs)
+        assert all(f > 0 for f in freqs)
+    
+    def test_chord_to_motif(self):
+        """Test converting chord to motif."""
+        chord = Chord.major('C', octave=4)
+        motif = chord.to_motif(duration=1.0)
+        
+        assert isinstance(motif, Motif)
+        assert len(motif.intervals) == 3
+    
+    def test_chord_invert(self):
+        """Test chord inversion."""
+        chord = Chord.major('C', octave=4)
+        inverted = chord.invert(inversion=1)
+        
+        assert isinstance(inverted, Chord)
+

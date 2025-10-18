@@ -27,9 +27,13 @@ pip install -e ".[export]"
 | Module | Purpose | Key Classes/Concepts |
 |--------|---------|---------------------|
 | `algorythm.synth` | Defines sound sources and timbres | `Oscillator`, `Filter`, `ADSR`, `SynthPresets`, `Synth` |
-| `algorythm.sequence` | Handles rhythmic and melodic patterns | `Motif`, `Rhythm`, `Arpeggiator`, `Scale` |
-| `algorythm.structure` | Arranges and composes the final track | `Track`, `Composition`, `EffectChain`, `Reverb` |
+| `algorythm.sequence` | Handles rhythmic and melodic patterns | `Motif`, `Rhythm`, `Arpeggiator`, `Scale`, `Chord` |
+| `algorythm.structure` | Arranges and composes the final track | `Track`, `Composition`, `EffectChain`, `Reverb`, `Delay`, `Chorus`, `Flanger`, `Distortion`, `Compression` |
 | `algorythm.export` | Renders and saves the final audio | `RenderEngine`, `Exporter` |
+| `algorythm.generative` | Generative composition tools | `LSystem`, `CellularAutomata` |
+| `algorythm.automation` | Parameter automation and data sonification | `Automation`, `AutomationTrack`, `DataSonification` |
+| `algorythm.visualization` | Synchronized audio visualization | `WaveformVisualizer`, `SpectrogramVisualizer`, `FrequencyScopeVisualizer`, `VideoRenderer` |
+| `algorythm.sampler` | Sample playback and manipulation | `Sample`, `Sampler` |
 
 ## Quick Start
 
@@ -98,10 +102,12 @@ python composition_example.py
 
 ### Synth Module
 
-**Oscillator**: Generates basic waveforms (sine, square, saw, triangle)
+**Oscillator**: Generates basic waveforms (sine, square, saw, triangle, noise)
 ```python
 from algorythm.synth import Oscillator
 osc = Oscillator(waveform='sine', frequency=440.0, amplitude=1.0)
+# Noise waveform for percussion and effects
+noise = Oscillator(waveform='noise')
 ```
 
 **Filter**: Applies frequency filtering (lowpass, highpass, bandpass, notch)
@@ -139,6 +145,17 @@ c_major = Scale.major('C', octave=4)
 a_minor = Scale.minor('A', octave=3)
 ```
 
+**Chord**: Musical chord definitions
+```python
+from algorythm.sequence import Chord
+c_major_chord = Chord.major('C', octave=4)
+a_minor7_chord = Chord.minor7('A', octave=3)
+# Get frequencies from chord
+freqs = c_major_chord.get_frequencies()
+# Convert chord to motif for arpeggiation
+motif = c_major_chord.to_motif()
+```
+
 **Motif**: Musical motif with intervals and durations
 ```python
 from algorythm.sequence import Motif, Scale
@@ -164,20 +181,131 @@ comp = Composition(tempo=120)
 comp.add_track('Lead', synth).repeat_motif(melody, bars=4)
 ```
 
-**Effects**: Audio effects (Reverb, Delay, Chorus)
+**Effects**: Audio effects (Reverb, Delay, Chorus, Flanger, Distortion, Compression)
 ```python
-from algorythm.structure import Reverb, Delay
+from algorythm.structure import Reverb, Delay, Flanger, Distortion, Compression
 reverb = Reverb(mix=0.3, room_size=0.5)
 delay = Delay(delay_time=0.5, feedback=0.3, mix=0.3)
+flanger = Flanger(rate=0.5, depth=0.5, mix=0.5)
+distortion = Distortion(drive=0.7, tone=0.5, mix=1.0)
+compression = Compression(threshold=-20.0, ratio=4.0, attack=0.005, release=0.1)
 ```
 
 ### Export Module
 
-**Exporter**: Exports audio to various formats
+**Exporter**: Exports audio to various formats (WAV, FLAC, MP3, OGG)
 ```python
 from algorythm.export import Exporter
 exporter = Exporter()
 exporter.export(audio_signal, 'output.wav', sample_rate=44100, quality='high')
+# For MP3, OGG, FLAC: install with pip install -e ".[export]"
+exporter.export(audio_signal, 'output.flac', sample_rate=44100, quality='high')
+exporter.export(audio_signal, 'output.mp3', sample_rate=44100, quality='high')
+exporter.export(audio_signal, 'output.ogg', sample_rate=44100, quality='high')
+```
+
+### Generative Module
+
+**L-System**: Generate fractal-like melodies and rhythms
+```python
+from algorythm.generative import LSystem
+lsys = LSystem(axiom='A', rules={'A': 'AB', 'B': 'AC', 'C': 'A'}, iterations=3)
+lsys.generate()
+motif = lsys.to_motif(symbol_map={'A': 0, 'B': 2, 'C': 4})
+```
+
+**CellularAutomata**: Create evolving soundscapes and rhythmic textures
+```python
+from algorythm.generative import CellularAutomata
+ca = CellularAutomata(width=16, height=8)
+ca.evolve()
+motif = ca.to_motif(row=-1)  # Convert last row to motif
+rhythm = ca.to_rhythm_pattern(row=-1)  # Convert to rhythm
+```
+
+### Automation Module
+
+**Automation**: Parameter automation with various curve types
+```python
+from algorythm.automation import Automation
+# Linear fade-in
+fade_in = Automation.fade_in(duration=2.0, target_value=1.0)
+# Exponential automation
+auto = Automation(0.0, 1.0, duration=4.0, curve_type='exponential')
+value = auto.get_value(time=2.0)
+# Bézier curves for custom automation
+bezier = Automation(0.0, 1.0, duration=4.0, curve_type='bezier', control_points=[0.2, 0.8])
+```
+
+**DataSonification**: Map data to musical parameters
+```python
+from algorythm.automation import DataSonification
+# Sonify stock market data
+data = [100, 105, 103, 110, 108, 115]
+ds = DataSonification(data, param_range=(0.0, 1.0), scaling='linear')
+pitches = ds.to_pitch_sequence(scale=Scale.major('C'))
+rhythm = ds.to_rhythm_pattern(min_duration=0.25, max_duration=2.0)
+volumes = ds.to_volume_envelope(min_volume=0.1, max_volume=1.0)
+```
+
+### Visualization Module
+
+**WaveformVisualizer**: Real-time waveform display
+```python
+from algorythm.visualization import WaveformVisualizer
+viz = WaveformVisualizer(sample_rate=44100, window_size=1024)
+waveform_data = viz.generate(audio_signal)
+image = viz.to_image_data(audio_signal, height=256, width=1024)
+```
+
+**SpectrogramVisualizer**: Frequency content over time
+```python
+from algorythm.visualization import SpectrogramVisualizer
+viz = SpectrogramVisualizer(sample_rate=44100, window_size=2048, hop_size=512)
+spectrogram = viz.generate(audio_signal)
+time_axis = viz.get_time_axis(num_frames=spectrogram.shape[1])
+freq_axis = viz.get_frequency_axis()
+```
+
+**FrequencyScopeVisualizer**: Current frequency spectrum
+```python
+from algorythm.visualization import FrequencyScopeVisualizer
+viz = FrequencyScopeVisualizer(sample_rate=44100, fft_size=2048, freq_range=(20.0, 20000.0))
+spectrum = viz.generate(audio_signal)
+freqs, mags = viz.filter_frequency_range(spectrum)
+```
+
+**VideoRenderer**: Synchronized video with audio visualization
+```python
+from algorythm.visualization import VideoRenderer, WaveformVisualizer
+renderer = VideoRenderer(width=1920, height=1080, fps=30)
+viz = WaveformVisualizer()
+frames = renderer.render_frames(audio_signal, viz, output_path='output.mp4')
+```
+
+### Sampler Module
+
+**Sample**: Load and manipulate audio samples
+```python
+from algorythm.sampler import Sample
+# Load from file
+sample = Sample(file_path='kick.wav')
+# Resample, trim, normalize
+resampled = sample.resample(target_rate=22050)
+trimmed = sample.trim(start_time=0.1, end_time=0.5)
+normalized = sample.normalize(target_level=1.0)
+```
+
+**Sampler**: Trigger and manipulate samples
+```python
+from algorythm.sampler import Sampler
+sampler = Sampler.from_file('snare.wav')
+# Trigger with pitch shift
+output = sampler.trigger(pitch_shift=12.0, volume=0.8)
+# Trigger at specific frequency
+output = sampler.trigger_note(frequency=440.0, base_frequency=220.0)
+# Create loops
+looped = sampler.create_loop(num_loops=4, fade_time=0.01)
 ```
 
 ## Technical Considerations

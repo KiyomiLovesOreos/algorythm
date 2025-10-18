@@ -18,7 +18,7 @@ class Oscillator:
     
     def __init__(
         self,
-        waveform: Literal['sine', 'square', 'saw', 'triangle'] = 'sine',
+        waveform: Literal['sine', 'square', 'saw', 'triangle', 'noise'] = 'sine',
         frequency: float = 440.0,
         amplitude: float = 1.0,
         phase: float = 0.0
@@ -59,6 +59,9 @@ class Oscillator:
             signal = 2 * (t * self.frequency - np.floor(0.5 + t * self.frequency))
         elif self.waveform == 'triangle':
             signal = 2 * np.abs(2 * (t * self.frequency - np.floor(0.5 + t * self.frequency))) - 1
+        elif self.waveform == 'noise':
+            # White noise: random values between -1 and 1
+            signal = np.random.uniform(-1, 1, num_samples)
         else:
             raise ValueError(f"Unknown waveform type: {self.waveform}")
         
@@ -255,7 +258,7 @@ class Synth:
     
     def __init__(
         self,
-        waveform: Literal['sine', 'square', 'saw', 'triangle'] = 'sine',
+        waveform: Literal['sine', 'square', 'saw', 'triangle', 'noise'] = 'sine',
         filter: Optional[Filter] = None,
         envelope: Optional[ADSR] = None
     ):
