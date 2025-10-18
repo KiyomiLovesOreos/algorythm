@@ -179,29 +179,29 @@ class Scale:
         self.root_midi = self.NOTE_NAMES[root] + (octave * 12) + 12  # +12 for MIDI offset
     
     @classmethod
-    def major(cls, root: str, octave: int = 4) -> 'Scale':
+    def major(cls, root: str, octave: int = 4, tuning: Optional[Tuning] = None) -> 'Scale':
         """Create a major scale."""
-        return cls(root, 'major', octave)
+        return cls(root, 'major', octave, tuning)
     
     @classmethod
-    def minor(cls, root: str, octave: int = 4) -> 'Scale':
+    def minor(cls, root: str, octave: int = 4, tuning: Optional[Tuning] = None) -> 'Scale':
         """Create a minor scale."""
-        return cls(root, 'minor', octave)
+        return cls(root, 'minor', octave, tuning)
     
     @classmethod
-    def pentatonic_major(cls, root: str, octave: int = 4) -> 'Scale':
+    def pentatonic_major(cls, root: str, octave: int = 4, tuning: Optional[Tuning] = None) -> 'Scale':
         """Create a pentatonic major scale."""
-        return cls(root, 'pentatonic_major', octave)
+        return cls(root, 'pentatonic_major', octave, tuning)
     
     @classmethod
-    def pentatonic_minor(cls, root: str, octave: int = 4) -> 'Scale':
+    def pentatonic_minor(cls, root: str, octave: int = 4, tuning: Optional[Tuning] = None) -> 'Scale':
         """Create a pentatonic minor scale."""
-        return cls(root, 'pentatonic_minor', octave)
+        return cls(root, 'pentatonic_minor', octave, tuning)
     
     @classmethod
-    def blues(cls, root: str, octave: int = 4) -> 'Scale':
+    def blues(cls, root: str, octave: int = 4, tuning: Optional[Tuning] = None) -> 'Scale':
         """Create a blues scale."""
-        return cls(root, 'blues', octave)
+        return cls(root, 'blues', octave, tuning)
     
     def get_note(self, degree: int) -> int:
         """
