@@ -1,10 +1,10 @@
-"""Tests for audionaut.structure module."""
+"""Tests for algorythm.structure module."""
 
 import numpy as np
 import pytest
-from audionaut.synth import Synth, SynthPresets
-from audionaut.sequence import Motif, Scale
-from audionaut.structure import Reverb, Delay, EffectChain, Track, Composition
+from algorythm.synth import Synth, SynthPresets
+from algorythm.sequence import Motif, Scale
+from algorythm.structure import Reverb, Delay, EffectChain, Track, Composition
 
 
 class TestEffects:

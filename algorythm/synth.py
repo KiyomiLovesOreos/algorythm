@@ -1,5 +1,5 @@
 """
-audionaut.synth - Defines sound sources and timbres
+algorythm.synth - Defines sound sources and timbres
 
 This module provides the core synthesis components including oscillators,
 filters, envelopes, and synth presets.

@@ -1,5 +1,5 @@
 """
-audionaut.sequence - Handles rhythmic and melodic patterns
+algorythm.sequence - Handles rhythmic and melodic patterns
 
 This module provides tools for creating musical sequences, motifs, rhythms,
 and arpeggios.

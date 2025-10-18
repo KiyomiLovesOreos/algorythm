@@ -1,8 +1,8 @@
-"""Tests for audionaut.synth module."""
+"""Tests for algorythm.synth module."""
 
 import numpy as np
 import pytest
-from audionaut.synth import Oscillator, Filter, ADSR, Synth, SynthPresets
+from algorythm.synth import Oscillator, Filter, ADSR, Synth, SynthPresets
 
 
 class TestOscillator:

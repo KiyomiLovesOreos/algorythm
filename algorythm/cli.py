@@ -1,5 +1,5 @@
 """
-Command-line interface for audionaut.
+Command-line interface for algorythm.
 """
 
 import argparse
@@ -9,12 +9,12 @@ import sys
 def main():
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(
-        description='Audionaut - A Python Library for Algorithmic Music',
+        description='Algorythm - A Python Library for Algorithmic Music',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  audionaut --version      Show version information
-  audionaut --help         Show this help message
+  algorythm --version      Show version information
+  algorythm --help         Show this help message
 
 For more information, visit: https://github.com/KiyomiLovesOreos/synthesia
         """
@@ -45,8 +45,8 @@ def run_example(example_name):
     print(f"Running {example_name} example...")
     
     if example_name == 'basic':
-        from audionaut.synth import Synth, Filter, ADSR
-        from audionaut.export import Exporter
+        from algorythm.synth import Synth, Filter, ADSR
+        from algorythm.export import Exporter
         
         warm_pad = Synth(
             waveform='saw',
@@ -62,9 +62,9 @@ def run_example(example_name):
         print("Exported to 'warm_pad.wav'")
         
     elif example_name == 'composition':
-        from audionaut.synth import Synth, Filter, ADSR
-        from audionaut.sequence import Motif, Scale
-        from audionaut.structure import Composition, Reverb
+        from algorythm.synth import Synth, Filter, ADSR
+        from algorythm.sequence import Motif, Scale
+        from algorythm.structure import Composition, Reverb
         
         warm_pad = Synth(
             waveform='saw',
@@ -85,9 +85,9 @@ def run_example(example_name):
         print("Exported to 'epic_track.wav'")
         
     elif example_name == 'advanced':
-        from audionaut.synth import SynthPresets
-        from audionaut.sequence import Motif, Scale, Arpeggiator
-        from audionaut.structure import Composition, Reverb, Delay
+        from algorythm.synth import SynthPresets
+        from algorythm.sequence import Motif, Scale, Arpeggiator
+        from algorythm.structure import Composition, Reverb, Delay
         
         composition = Composition(tempo=128)
         

@@ -1,4 +1,4 @@
-# Synthesia (Audionaut)
+# Algorythm
 
 **A Python Library for Algorithmic Music**
 
@@ -26,10 +26,10 @@ pip install -e ".[export]"
 
 | Module | Purpose | Key Classes/Concepts |
 |--------|---------|---------------------|
-| `audionaut.synth` | Defines sound sources and timbres | `Oscillator`, `Filter`, `ADSR`, `SynthPresets`, `Synth` |
-| `audionaut.sequence` | Handles rhythmic and melodic patterns | `Motif`, `Rhythm`, `Arpeggiator`, `Scale` |
-| `audionaut.structure` | Arranges and composes the final track | `Track`, `Composition`, `EffectChain`, `Reverb` |
-| `audionaut.export` | Renders and saves the final audio | `RenderEngine`, `Exporter` |
+| `algorythm.synth` | Defines sound sources and timbres | `Oscillator`, `Filter`, `ADSR`, `SynthPresets`, `Synth` |
+| `algorythm.sequence` | Handles rhythmic and melodic patterns | `Motif`, `Rhythm`, `Arpeggiator`, `Scale` |
+| `algorythm.structure` | Arranges and composes the final track | `Track`, `Composition`, `EffectChain`, `Reverb` |
+| `algorythm.export` | Renders and saves the final audio | `RenderEngine`, `Exporter` |
 
 ## Quick Start
 
@@ -38,7 +38,7 @@ pip install -e ".[export]"
 Define a custom instrument (a Synth) once, then reference it repeatedly:
 
 ```python
-from audionaut.synth import Synth, Filter, ADSR
+from algorythm.synth import Synth, Filter, ADSR
 
 # Create a warm synth sound
 warm_pad = Synth(
@@ -53,8 +53,8 @@ warm_pad = Synth(
 Define a musical idea (Motif) and apply it to a structured timeline (Track):
 
 ```python
-from audionaut.sequence import Motif, Scale
-from audionaut.structure import Composition, Reverb
+from algorythm.sequence import Motif, Scale
+from algorythm.structure import Composition, Reverb
 
 # Create a simple, rising motif
 melody = Motif.from_intervals([0, 2, 4, 7], scale=Scale.major('C'))
@@ -100,31 +100,31 @@ python composition_example.py
 
 **Oscillator**: Generates basic waveforms (sine, square, saw, triangle)
 ```python
-from audionaut.synth import Oscillator
+from algorythm.synth import Oscillator
 osc = Oscillator(waveform='sine', frequency=440.0, amplitude=1.0)
 ```
 
 **Filter**: Applies frequency filtering (lowpass, highpass, bandpass, notch)
 ```python
-from audionaut.synth import Filter
+from algorythm.synth import Filter
 lpf = Filter.lowpass(cutoff=1000, resonance=0.5)
 ```
 
 **ADSR**: Attack, Decay, Sustain, Release envelope
 ```python
-from audionaut.synth import ADSR
+from algorythm.synth import ADSR
 envelope = ADSR(attack=0.1, decay=0.2, sustain=0.7, release=0.3)
 ```
 
 **Synth**: Main synthesizer combining oscillator, filter, and envelope
 ```python
-from audionaut.synth import Synth, Filter, ADSR
+from algorythm.synth import Synth, Filter, ADSR
 synth = Synth(waveform='saw', filter=Filter.lowpass(2000), envelope=ADSR())
 ```
 
 **SynthPresets**: Pre-configured synth sounds
 ```python
-from audionaut.synth import SynthPresets
+from algorythm.synth import SynthPresets
 warm_pad = SynthPresets.warm_pad()
 pluck = SynthPresets.pluck()
 bass = SynthPresets.bass()
@@ -134,14 +134,14 @@ bass = SynthPresets.bass()
 
 **Scale**: Musical scale definitions
 ```python
-from audionaut.sequence import Scale
+from algorythm.sequence import Scale
 c_major = Scale.major('C', octave=4)
 a_minor = Scale.minor('A', octave=3)
 ```
 
 **Motif**: Musical motif with intervals and durations
 ```python
-from audionaut.sequence import Motif, Scale
+from algorythm.sequence import Motif, Scale
 melody = Motif.from_intervals([0, 2, 4, 7], scale=Scale.major('C'))
 transposed = melody.transpose(semitones=5)
 reversed_melody = melody.reverse()
@@ -150,7 +150,7 @@ inverted = melody.invert()
 
 **Arpeggiator**: Generates arpeggios from motifs
 ```python
-from audionaut.sequence import Arpeggiator
+from algorythm.sequence import Arpeggiator
 arp = Arpeggiator(pattern='up-down', octaves=2)
 arpeggiated = arp.arpeggiate(melody)
 ```
@@ -159,14 +159,14 @@ arpeggiated = arp.arpeggiate(melody)
 
 **Composition**: Main composition container
 ```python
-from audionaut.structure import Composition
+from algorythm.structure import Composition
 comp = Composition(tempo=120)
 comp.add_track('Lead', synth).repeat_motif(melody, bars=4)
 ```
 
 **Effects**: Audio effects (Reverb, Delay, Chorus)
 ```python
-from audionaut.structure import Reverb, Delay
+from algorythm.structure import Reverb, Delay
 reverb = Reverb(mix=0.3, room_size=0.5)
 delay = Delay(delay_time=0.5, feedback=0.3, mix=0.3)
 ```
@@ -175,7 +175,7 @@ delay = Delay(delay_time=0.5, feedback=0.3, mix=0.3)
 
 **Exporter**: Exports audio to various formats
 ```python
-from audionaut.export import Exporter
+from algorythm.export import Exporter
 exporter = Exporter()
 exporter.export(audio_signal, 'output.wav', sample_rate=44100, quality='high')
 ```

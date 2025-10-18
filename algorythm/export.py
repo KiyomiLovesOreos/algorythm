@@ -1,5 +1,5 @@
 """
-audionaut.export - Renders and saves the final audio
+algorythm.export - Renders and saves the final audio
 
 This module provides tools for exporting compositions to various audio formats.
 """

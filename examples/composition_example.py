@@ -4,9 +4,9 @@ Composition Example
 This example demonstrates the full API as described in the problem statement.
 """
 
-from audionaut.synth import Synth, Filter, ADSR
-from audionaut.sequence import Motif, Scale
-from audionaut.structure import Composition, Reverb
+from algorythm.synth import Synth, Filter, ADSR
+from algorythm.sequence import Motif, Scale
+from algorythm.structure import Composition, Reverb
 
 # Create a warm synth sound
 warm_pad = Synth(

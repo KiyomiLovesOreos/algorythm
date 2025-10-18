@@ -1,5 +1,5 @@
 """
-Setup script for Synthesia (Audionaut) library.
+Setup script for Algorythm library.
 """
 
 from setuptools import setup, find_packages
@@ -8,9 +8,9 @@ with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 setup(
-    name="audionaut",
+    name="algorythm",
     version="0.1.0",
-    author="Synthesia Contributors",
+    author="Algorythm Contributors",
     description="A Python Library for Algorithmic Music - Manim-inspired declarative audio synthesis",
     long_description=long_description,
     long_description_content_type="text/markdown",
@@ -48,7 +48,7 @@ setup(
     },
     entry_points={
         "console_scripts": [
-            "audionaut=audionaut.cli:main",
+            "algorythm=algorythm.cli:main",
         ],
     },
 )
