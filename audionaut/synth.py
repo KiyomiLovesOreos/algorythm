@@ -171,34 +171,44 @@ class ADSR:
         attack_samples = int(self.attack * sample_rate)
         decay_samples = int(self.decay * sample_rate)
         release_samples = int(self.release * sample_rate)
+        
+        # Calculate available samples for sustain
         sustain_samples = num_samples - attack_samples - decay_samples - release_samples
         
-        # Ensure non-negative sample counts
+        # If envelope phases exceed duration, scale them proportionally
         if sustain_samples < 0:
-            sustain_samples = 0
+            total_env_samples = attack_samples + decay_samples + release_samples
+            if total_env_samples > 0:
+                scale = num_samples / total_env_samples
+                attack_samples = int(attack_samples * scale)
+                decay_samples = int(decay_samples * scale)
+                release_samples = num_samples - attack_samples - decay_samples
+                sustain_samples = 0
         
         idx = 0
         
         # Attack
-        if attack_samples > 0:
-            envelope[idx:idx + attack_samples] = np.linspace(0, 1, attack_samples)
-            idx += attack_samples
+        if attack_samples > 0 and idx < num_samples:
+            end_idx = min(idx + attack_samples, num_samples)
+            envelope[idx:end_idx] = np.linspace(0, 1, end_idx - idx)
+            idx = end_idx
         
         # Decay
-        if decay_samples > 0:
-            envelope[idx:idx + decay_samples] = np.linspace(1, self.sustain, decay_samples)
-            idx += decay_samples
+        if decay_samples > 0 and idx < num_samples:
+            end_idx = min(idx + decay_samples, num_samples)
+            envelope[idx:end_idx] = np.linspace(1, self.sustain, end_idx - idx)
+            idx = end_idx
         
         # Sustain
-        if sustain_samples > 0:
-            envelope[idx:idx + sustain_samples] = self.sustain
-            idx += sustain_samples
+        if sustain_samples > 0 and idx < num_samples:
+            end_idx = min(idx + sustain_samples, num_samples)
+            envelope[idx:end_idx] = self.sustain
+            idx = end_idx
         
         # Release
         if release_samples > 0 and idx < num_samples:
-            envelope[idx:idx + release_samples] = np.linspace(
-                self.sustain, 0, min(release_samples, num_samples - idx)
-            )
+            end_idx = min(idx + release_samples, num_samples)
+            envelope[idx:end_idx] = np.linspace(self.sustain, 0, end_idx - idx)
         
         return envelope
 
