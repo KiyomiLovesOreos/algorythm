@@ -2,7 +2,7 @@
 
 **A Python Library for Algorithmic Music**
 
-Designed to take code as an input and give audio as an output, like the main animation library for Python by 3Blue1Brown (Manim).
+Designed to take code as an input and give audio as an output, like the manim animation library for Python by 3Blue1Brown.
 
 ## Core Philosophy (Manim-Inspired)
 
