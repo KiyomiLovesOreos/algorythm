@@ -5,7 +5,7 @@ This module provides tools for generating visual output alongside audio,
 including waveforms, spectrograms, and frequency scopes.
 """
 
-from typing import Optional, Literal, Tuple
+from typing import Optional, Literal, Tuple, List, Dict, Any
 import numpy as np
 
 
@@ -446,3 +446,316 @@ class VideoRenderer:
         # for frame in frames:
         #     out.write(frame)
         # out.release()
+
+
+class OscilloscopeVisualizer(Visualizer):
+    """
+    Oscilloscope/Phase Scope visualization.
+    
+    Displays real-time feedback on individual sound waves and stereo relationships.
+    """
+    
+    def __init__(
+        self,
+        sample_rate: int = 44100,
+        window_size: int = 1024,
+        mode: Literal['waveform', 'lissajous', 'phase'] = 'waveform'
+    ):
+        """
+        Initialize an oscilloscope visualizer.
+        
+        Args:
+            sample_rate: Audio sample rate in Hz
+            window_size: Size of visualization window
+            mode: Display mode (waveform, lissajous, phase)
+        """
+        super().__init__(sample_rate)
+        self.window_size = window_size
+        self.mode = mode
+    
+    def generate(self, signal: np.ndarray) -> np.ndarray:
+        """
+        Generate oscilloscope visualization data.
+        
+        Args:
+            signal: Audio signal (mono or stereo)
+            
+        Returns:
+            Visualization data
+        """
+        if self.mode == 'waveform':
+            return self._waveform_mode(signal)
+        elif self.mode == 'lissajous':
+            return self._lissajous_mode(signal)
+        elif self.mode == 'phase':
+            return self._phase_mode(signal)
+        else:
+            return self._waveform_mode(signal)
+    
+    def _waveform_mode(self, signal: np.ndarray) -> np.ndarray:
+        """
+        Generate waveform oscilloscope display.
+        
+        Args:
+            signal: Audio signal
+            
+        Returns:
+            Waveform data for display
+        """
+        # Take last window_size samples
+        if len(signal) < self.window_size:
+            padded = np.pad(signal, (self.window_size - len(signal), 0))
+            return padded
+        
+        return signal[-self.window_size:]
+    
+    def _lissajous_mode(self, signal: np.ndarray) -> np.ndarray:
+        """
+        Generate Lissajous curve (X-Y scope) for stereo analysis.
+        
+        Args:
+            signal: Stereo audio signal (2, N) or mono
+            
+        Returns:
+            X-Y coordinate pairs for Lissajous curve
+        """
+        # For mono, create a delayed version for X-Y plot
+        if signal.ndim == 1:
+            left = signal[-self.window_size:]
+            right = np.roll(left, self.window_size // 4)
+        else:
+            left = signal[0, -self.window_size:]
+            right = signal[1, -self.window_size:]
+        
+        # Combine as X-Y pairs
+        return np.vstack([left, right])
+    
+    def _phase_mode(self, signal: np.ndarray) -> np.ndarray:
+        """
+        Generate phase correlation display.
+        
+        Args:
+            signal: Stereo audio signal (2, N) or mono
+            
+        Returns:
+            Phase correlation data over time
+        """
+        if signal.ndim == 1:
+            # For mono, return zeros (no phase difference)
+            return np.zeros(self.window_size)
+        
+        # Calculate phase correlation for windows
+        left = signal[0]
+        right = signal[1]
+        
+        num_windows = len(left) // self.window_size
+        if num_windows == 0:
+            return np.zeros(1)
+        
+        correlations = []
+        for i in range(num_windows):
+            start = i * self.window_size
+            end = start + self.window_size
+            
+            l_window = left[start:end]
+            r_window = right[start:end]
+            
+            # Calculate correlation
+            if np.std(l_window) > 0 and np.std(r_window) > 0:
+                corr = np.corrcoef(l_window, r_window)[0, 1]
+            else:
+                corr = 0.0
+            
+            correlations.append(corr)
+        
+        return np.array(correlations)
+    
+    def to_image_data(
+        self,
+        signal: np.ndarray,
+        height: int = 256,
+        width: int = 512
+    ) -> np.ndarray:
+        """
+        Convert oscilloscope data to image.
+        
+        Args:
+            signal: Audio signal
+            height: Image height in pixels
+            width: Image width in pixels
+            
+        Returns:
+            Image data array
+        """
+        data = self.generate(signal)
+        image = np.zeros((height, width))
+        
+        if self.mode == 'waveform':
+            # Draw waveform
+            x_coords = np.linspace(0, width - 1, len(data)).astype(int)
+            y_coords = ((data + 1) / 2 * (height - 1)).astype(int)
+            y_coords = np.clip(y_coords, 0, height - 1)
+            
+            for x, y in zip(x_coords, y_coords):
+                if 0 <= x < width:
+                    image[y, x] = 1.0
+        
+        elif self.mode == 'lissajous' or self.mode == 'phase':
+            # Draw X-Y plot
+            if data.ndim == 2 and data.shape[0] == 2:
+                x_coords = ((data[0] + 1) / 2 * (width - 1)).astype(int)
+                y_coords = ((data[1] + 1) / 2 * (height - 1)).astype(int)
+                
+                x_coords = np.clip(x_coords, 0, width - 1)
+                y_coords = np.clip(y_coords, 0, height - 1)
+                
+                for x, y in zip(x_coords, y_coords):
+                    image[y, x] = 1.0
+        
+        return image
+
+
+class PianoRollVisualizer(Visualizer):
+    """
+    Piano Roll / Note Display visualization.
+    
+    Visual representation of which notes are playing on a musical grid.
+    """
+    
+    def __init__(
+        self,
+        sample_rate: int = 44100,
+        time_resolution: float = 0.1,
+        pitch_range: tuple = (36, 84)  # C2 to C6
+    ):
+        """
+        Initialize a piano roll visualizer.
+        
+        Args:
+            sample_rate: Audio sample rate in Hz
+            time_resolution: Time resolution in seconds per column
+            pitch_range: Range of MIDI notes to display (min, max)
+        """
+        super().__init__(sample_rate)
+        self.time_resolution = time_resolution
+        self.pitch_range = pitch_range
+        self.notes: List[Dict[str, Any]] = []
+    
+    def add_note(
+        self,
+        midi_note: int,
+        start_time: float,
+        duration: float,
+        velocity: float = 1.0
+    ) -> None:
+        """
+        Add a note to the piano roll.
+        
+        Args:
+            midi_note: MIDI note number
+            start_time: Start time in seconds
+            duration: Duration in seconds
+            velocity: Note velocity (0.0 to 1.0)
+        """
+        self.notes.append({
+            'midi_note': midi_note,
+            'start_time': start_time,
+            'duration': duration,
+            'velocity': velocity
+        })
+    
+    def clear_notes(self) -> None:
+        """Clear all notes from the piano roll."""
+        self.notes = []
+    
+    def generate(self, signal: np.ndarray) -> np.ndarray:
+        """
+        Generate piano roll visualization data.
+        
+        This method is included for compatibility but piano roll
+        visualization is typically based on note data, not audio signal.
+        
+        Args:
+            signal: Audio signal (not used for piano roll)
+            
+        Returns:
+            Placeholder array
+        """
+        return np.array([])
+    
+    def to_grid(
+        self,
+        duration: float,
+        height: Optional[int] = None,
+        width: Optional[int] = None
+    ) -> np.ndarray:
+        """
+        Generate piano roll grid representation.
+        
+        Args:
+            duration: Total duration to display
+            height: Grid height (defaults to pitch range)
+            width: Grid width (defaults to duration / time_resolution)
+            
+        Returns:
+            2D grid with note activations
+        """
+        if height is None:
+            height = self.pitch_range[1] - self.pitch_range[0]
+        
+        if width is None:
+            width = int(duration / self.time_resolution)
+        
+        grid = np.zeros((height, width))
+        
+        for note in self.notes:
+            midi_note = note['midi_note']
+            start_time = note['start_time']
+            note_duration = note['duration']
+            velocity = note['velocity']
+            
+            # Check if note is in pitch range
+            if midi_note < self.pitch_range[0] or midi_note >= self.pitch_range[1]:
+                continue
+            
+            # Calculate grid positions
+            pitch_idx = self.pitch_range[1] - midi_note - 1  # Invert for display
+            start_col = int(start_time / self.time_resolution)
+            end_col = int((start_time + note_duration) / self.time_resolution)
+            
+            # Clamp to grid bounds
+            start_col = max(0, min(start_col, width - 1))
+            end_col = max(0, min(end_col, width))
+            
+            # Set note activation
+            if 0 <= pitch_idx < height:
+                grid[pitch_idx, start_col:end_col] = velocity
+        
+        return grid
+    
+    def to_image_data(
+        self,
+        duration: float,
+        height: int = 480,
+        width: int = 640
+    ) -> np.ndarray:
+        """
+        Convert piano roll to image data.
+        
+        Args:
+            duration: Total duration to display
+            height: Image height in pixels
+            width: Image width in pixels
+            
+        Returns:
+            Image data array
+        """
+        grid = self.to_grid(duration, self.pitch_range[1] - self.pitch_range[0], width)
+        
+        # Resize to target dimensions if needed
+        if grid.shape[0] != height:
+            # Simple nearest-neighbor resize
+            row_indices = (np.arange(height) * grid.shape[0] / height).astype(int)
+            grid = grid[row_indices, :]
+        
+        return grid

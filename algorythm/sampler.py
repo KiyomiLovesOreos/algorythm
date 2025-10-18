@@ -336,3 +336,186 @@ class Sampler:
         """
         sample = Sample(file_path=file_path)
         return cls(sample)
+
+
+class GranularSynth:
+    """
+    Granular synthesis engine for creating rich textures and soundscapes.
+    
+    Breaks audio samples into tiny "grains" with programmatic control over
+    grain density, size, position, speed, and spatial distribution.
+    """
+    
+    def __init__(
+        self,
+        sample: Sample,
+        grain_size: float = 0.05,
+        grain_density: float = 20.0,
+        grain_envelope: Literal['rectangular', 'triangular', 'gaussian', 'hann'] = 'hann'
+    ):
+        """
+        Initialize a granular synthesizer.
+        
+        Args:
+            sample: Audio sample to granulate
+            grain_size: Size of each grain in seconds
+            grain_density: Number of grains per second
+            grain_envelope: Envelope shape for each grain
+        """
+        self.sample = sample
+        self.grain_size = grain_size
+        self.grain_density = grain_density
+        self.grain_envelope = grain_envelope
+    
+    def generate_grain(
+        self,
+        position: float,
+        size: float,
+        pitch_shift: float = 0.0,
+        pan: float = 0.5
+    ) -> np.ndarray:
+        """
+        Generate a single grain from the sample.
+        
+        Args:
+            position: Position in the sample (0.0 to 1.0)
+            size: Grain size in seconds
+            pitch_shift: Pitch shift in semitones
+            pan: Stereo pan position (0.0 = left, 1.0 = right)
+            
+        Returns:
+            Grain audio data (mono or stereo)
+        """
+        if len(self.sample.data) == 0:
+            return np.array([])
+        
+        # Calculate grain start position in samples
+        start_sample = int(position * len(self.sample.data))
+        grain_samples = int(size * self.sample.sample_rate)
+        
+        # Extract grain
+        end_sample = min(start_sample + grain_samples, len(self.sample.data))
+        grain = self.sample.data[start_sample:end_sample].copy()
+        
+        # Apply pitch shift if needed
+        if pitch_shift != 0.0:
+            ratio = 2.0 ** (pitch_shift / 12.0)
+            new_length = int(len(grain) / ratio)
+            old_indices = np.linspace(0, len(grain) - 1, len(grain))
+            new_indices = np.linspace(0, len(grain) - 1, new_length)
+            grain = np.interp(new_indices, old_indices, grain)
+        
+        # Apply envelope
+        envelope = self._create_envelope(len(grain))
+        grain = grain * envelope
+        
+        return grain
+    
+    def _create_envelope(self, length: int) -> np.ndarray:
+        """
+        Create envelope for a grain.
+        
+        Args:
+            length: Length of grain in samples
+            
+        Returns:
+            Envelope array
+        """
+        t = np.linspace(0, 1, length)
+        
+        if self.grain_envelope == 'rectangular':
+            return np.ones(length)
+        elif self.grain_envelope == 'triangular':
+            return 1 - np.abs(2 * t - 1)
+        elif self.grain_envelope == 'gaussian':
+            # Gaussian envelope
+            center = 0.5
+            width = 0.2
+            return np.exp(-((t - center) ** 2) / (2 * width ** 2))
+        elif self.grain_envelope == 'hann':
+            # Hann window
+            return 0.5 * (1 - np.cos(2 * np.pi * t))
+        else:
+            return np.ones(length)
+    
+    def synthesize(
+        self,
+        duration: float,
+        position_range: tuple = (0.0, 1.0),
+        pitch_range: tuple = (0.0, 0.0),
+        spatial_spread: float = 0.0,
+        density_variation: float = 0.0
+    ) -> np.ndarray:
+        """
+        Synthesize granular texture over a specified duration.
+        
+        Args:
+            duration: Output duration in seconds
+            position_range: Range of sample positions to use (min, max) in 0.0-1.0
+            pitch_range: Range of pitch shifts in semitones (min, max)
+            spatial_spread: Amount of stereo spread (0.0 = mono, 1.0 = full stereo)
+            density_variation: Random variation in grain density (0.0 to 1.0)
+            
+        Returns:
+            Synthesized audio signal
+        """
+        total_samples = int(duration * self.sample.sample_rate)
+        output = np.zeros(total_samples)
+        
+        # Calculate number of grains
+        base_num_grains = int(duration * self.grain_density)
+        
+        # Apply density variation
+        if density_variation > 0:
+            variation = int(base_num_grains * density_variation)
+            num_grains = base_num_grains + np.random.randint(-variation, variation + 1)
+            num_grains = max(1, num_grains)
+        else:
+            num_grains = base_num_grains
+        
+        # Generate grains at random times
+        grain_times = np.sort(np.random.uniform(0, duration, num_grains))
+        
+        for grain_time in grain_times:
+            # Random position within range
+            position = np.random.uniform(position_range[0], position_range[1])
+            
+            # Random pitch shift within range
+            pitch_shift = np.random.uniform(pitch_range[0], pitch_range[1])
+            
+            # Random pan position
+            pan = 0.5 + np.random.uniform(-spatial_spread, spatial_spread) * 0.5
+            pan = np.clip(pan, 0.0, 1.0)
+            
+            # Generate grain
+            grain = self.generate_grain(position, self.grain_size, pitch_shift, pan)
+            
+            # Place grain in output
+            start_sample = int(grain_time * self.sample.sample_rate)
+            end_sample = min(start_sample + len(grain), total_samples)
+            grain_length = end_sample - start_sample
+            
+            if grain_length > 0:
+                output[start_sample:end_sample] += grain[:grain_length]
+        
+        # Normalize to prevent clipping
+        max_val = np.max(np.abs(output))
+        if max_val > 1.0:
+            output = output / max_val * 0.9
+        
+        return output
+    
+    @classmethod
+    def from_file(cls, file_path: str, **kwargs) -> 'GranularSynth':
+        """
+        Create a granular synth from an audio file.
+        
+        Args:
+            file_path: Path to audio file
+            **kwargs: Additional arguments for GranularSynth
+            
+        Returns:
+            GranularSynth instance
+        """
+        sample = Sample(file_path=file_path)
+        return cls(sample, **kwargs)
