@@ -23,7 +23,7 @@ class TestOscillator:
     
     def test_oscillator_waveforms(self):
         """Test different waveform types."""
-        waveforms = ['sine', 'square', 'saw', 'triangle']
+        waveforms = ['sine', 'square', 'saw', 'triangle', 'noise']
         for waveform in waveforms:
             osc = Oscillator(waveform=waveform, frequency=440.0)
             signal = osc.generate(duration=0.1)

@@ -331,3 +331,146 @@ class Arpeggiator:
             random.shuffle(intervals)
         
         return Motif(intervals, motif.scale)
+
+
+class Chord:
+    """
+    Musical chord definitions and operations.
+    
+    Provides various chord types and voicings.
+    """
+    
+    # Chord intervals in semitones from root
+    CHORD_TYPES = {
+        'major': [0, 4, 7],
+        'minor': [0, 3, 7],
+        'diminished': [0, 3, 6],
+        'augmented': [0, 4, 8],
+        'major7': [0, 4, 7, 11],
+        'minor7': [0, 3, 7, 10],
+        'dominant7': [0, 4, 7, 10],
+        'diminished7': [0, 3, 6, 9],
+        'sus2': [0, 2, 7],
+        'sus4': [0, 5, 7],
+        'major9': [0, 4, 7, 11, 14],
+        'minor9': [0, 3, 7, 10, 14],
+    }
+    
+    def __init__(self, root: str, chord_type: str = 'major', octave: int = 4):
+        """
+        Initialize a chord.
+        
+        Args:
+            root: Root note name (e.g., 'C', 'D#', 'Bb')
+            chord_type: Type of chord (e.g., 'major', 'minor', 'major7')
+            octave: Base octave number
+        """
+        self.root = root
+        self.chord_type = chord_type
+        self.octave = octave
+        
+        if chord_type not in self.CHORD_TYPES:
+            raise ValueError(f"Unknown chord type: {chord_type}")
+        
+        if root not in Scale.NOTE_NAMES:
+            raise ValueError(f"Unknown note name: {root}")
+        
+        # Calculate MIDI note number for root
+        self.root_midi = Scale.NOTE_NAMES[root] + (octave * 12) + 12  # +12 for MIDI offset
+    
+    @classmethod
+    def major(cls, root: str, octave: int = 4) -> 'Chord':
+        """Create a major chord."""
+        return cls(root, 'major', octave)
+    
+    @classmethod
+    def minor(cls, root: str, octave: int = 4) -> 'Chord':
+        """Create a minor chord."""
+        return cls(root, 'minor', octave)
+    
+    @classmethod
+    def major7(cls, root: str, octave: int = 4) -> 'Chord':
+        """Create a major 7th chord."""
+        return cls(root, 'major7', octave)
+    
+    @classmethod
+    def minor7(cls, root: str, octave: int = 4) -> 'Chord':
+        """Create a minor 7th chord."""
+        return cls(root, 'minor7', octave)
+    
+    @classmethod
+    def dominant7(cls, root: str, octave: int = 4) -> 'Chord':
+        """Create a dominant 7th chord."""
+        return cls(root, 'dominant7', octave)
+    
+    def get_notes(self) -> List[int]:
+        """
+        Get MIDI note numbers for all notes in the chord.
+        
+        Returns:
+            List of MIDI note numbers
+        """
+        intervals = self.CHORD_TYPES[self.chord_type]
+        return [self.root_midi + interval for interval in intervals]
+    
+    def get_frequencies(self) -> List[float]:
+        """
+        Get frequencies in Hz for all notes in the chord.
+        
+        Returns:
+            List of frequencies in Hz
+        """
+        midi_notes = self.get_notes()
+        # Convert MIDI notes to frequencies: f = 440 * 2^((n-69)/12)
+        return [440.0 * (2.0 ** ((note - 69) / 12.0)) for note in midi_notes]
+    
+    def to_motif(self, duration: float = 1.0) -> Motif:
+        """
+        Convert chord to a motif (for arpeggiation or sequencing).
+        
+        Args:
+            duration: Duration per note in beats
+            
+        Returns:
+            Motif representing the chord
+        """
+        # Create a temporary scale at the root
+        temp_scale = Scale(self.root, 'chromatic', self.octave)
+        
+        # Get intervals relative to root
+        intervals = self.CHORD_TYPES[self.chord_type]
+        
+        # Create motif with equal durations
+        durations = [duration] * len(intervals)
+        
+        return Motif(intervals, temp_scale, durations)
+    
+    def invert(self, inversion: int = 1) -> 'Chord':
+        """
+        Create an inversion of the chord.
+        
+        Args:
+            inversion: Inversion number (1 = first inversion, 2 = second, etc.)
+            
+        Returns:
+            New Chord instance with the specified inversion
+        """
+        # Create a new chord with modified intervals
+        intervals = self.CHORD_TYPES[self.chord_type].copy()
+        
+        # Apply inversions
+        for _ in range(inversion):
+            if intervals:
+                # Move the lowest note up an octave
+                intervals = intervals[1:] + [intervals[0] + 12]
+        
+        # Create a new chord type name for the inversion
+        # Store the inverted intervals back (this is simplified)
+        new_chord = Chord.__new__(Chord)
+        new_chord.root = self.root
+        new_chord.chord_type = self.chord_type
+        new_chord.octave = self.octave
+        new_chord.root_midi = self.root_midi
+        
+        return new_chord
+

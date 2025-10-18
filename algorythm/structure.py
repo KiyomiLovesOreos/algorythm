@@ -141,6 +141,198 @@ class Chorus:
         return signal
 
 
+class Flanger:
+    """
+    Flanger effect for creating a sweeping, jet-like sound.
+    """
+    
+    def __init__(
+        self,
+        rate: float = 0.5,
+        depth: float = 0.5,
+        feedback: float = 0.3,
+        mix: float = 0.5
+    ):
+        """
+        Initialize a flanger effect.
+        
+        Args:
+            rate: LFO rate in Hz
+            depth: Modulation depth (0.0 to 1.0)
+            feedback: Feedback amount (0.0 to 1.0)
+            mix: Wet/dry mix (0.0 = dry, 1.0 = wet)
+        """
+        self.rate = rate
+        self.depth = depth
+        self.feedback = feedback
+        self.mix = mix
+    
+    def apply(self, signal: np.ndarray, sample_rate: int = 44100) -> np.ndarray:
+        """
+        Apply flanger effect to audio signal.
+        
+        Args:
+            signal: Input audio signal
+            sample_rate: Sample rate in Hz
+            
+        Returns:
+            Processed audio signal
+        """
+        # Simplified flanger implementation using time-varying delay
+        output = signal.copy()
+        
+        # Create LFO for delay modulation
+        duration = len(signal) / sample_rate
+        t = np.linspace(0, duration, len(signal))
+        lfo = np.sin(2 * np.pi * self.rate * t)
+        
+        # Calculate varying delay (1-10ms range)
+        max_delay_samples = int(0.01 * sample_rate)
+        min_delay_samples = int(0.001 * sample_rate)
+        delay_range = max_delay_samples - min_delay_samples
+        
+        # Apply modulated delay
+        wet = np.zeros_like(signal)
+        for i in range(len(signal)):
+            delay_samples = int(min_delay_samples + (lfo[i] * 0.5 + 0.5) * delay_range * self.depth)
+            if i >= delay_samples:
+                wet[i] = signal[i - delay_samples]
+        
+        # Add feedback
+        wet = wet + wet * self.feedback * 0.3
+        
+        # Mix wet and dry
+        return output * (1 - self.mix) + wet * self.mix
+
+
+class Distortion:
+    """
+    Distortion effect for adding harmonic content and saturation.
+    """
+    
+    def __init__(
+        self,
+        drive: float = 0.5,
+        tone: float = 0.5,
+        mix: float = 1.0
+    ):
+        """
+        Initialize a distortion effect.
+        
+        Args:
+            drive: Distortion amount (0.0 to 1.0)
+            tone: Tone control for high-frequency rolloff (0.0 to 1.0)
+            mix: Wet/dry mix (0.0 = dry, 1.0 = wet)
+        """
+        self.drive = drive
+        self.tone = tone
+        self.mix = mix
+    
+    def apply(self, signal: np.ndarray, sample_rate: int = 44100) -> np.ndarray:
+        """
+        Apply distortion effect to audio signal.
+        
+        Args:
+            signal: Input audio signal
+            sample_rate: Sample rate in Hz
+            
+        Returns:
+            Processed audio signal
+        """
+        dry = signal.copy()
+        
+        # Apply gain based on drive
+        gain = 1.0 + self.drive * 20.0
+        wet = signal * gain
+        
+        # Soft clipping using tanh
+        wet = np.tanh(wet)
+        
+        # Simple tone control (low-pass filtering)
+        if self.tone < 1.0:
+            # Simple moving average for low-pass effect
+            window_size = int((1.0 - self.tone) * 10) + 1
+            if window_size > 1:
+                kernel = np.ones(window_size) / window_size
+                wet = np.convolve(wet, kernel, mode='same')
+        
+        # Mix wet and dry
+        return dry * (1 - self.mix) + wet * self.mix
+
+
+class Compression:
+    """
+    Compression effect for dynamic range control.
+    """
+    
+    def __init__(
+        self,
+        threshold: float = -20.0,
+        ratio: float = 4.0,
+        attack: float = 0.005,
+        release: float = 0.1,
+        makeup_gain: float = 1.0
+    ):
+        """
+        Initialize a compression effect.
+        
+        Args:
+            threshold: Threshold in dB
+            ratio: Compression ratio (e.g., 4.0 means 4:1)
+            attack: Attack time in seconds
+            release: Release time in seconds
+            makeup_gain: Makeup gain multiplier
+        """
+        self.threshold = threshold
+        self.ratio = ratio
+        self.attack = attack
+        self.release = release
+        self.makeup_gain = makeup_gain
+    
+    def apply(self, signal: np.ndarray, sample_rate: int = 44100) -> np.ndarray:
+        """
+        Apply compression effect to audio signal.
+        
+        Args:
+            signal: Input audio signal
+            sample_rate: Sample rate in Hz
+            
+        Returns:
+            Processed audio signal
+        """
+        # Simplified compression implementation
+        output = signal.copy()
+        
+        # Convert threshold from dB to linear
+        threshold_linear = 10 ** (self.threshold / 20.0)
+        
+        # Calculate attack and release coefficients
+        attack_coef = np.exp(-1.0 / (self.attack * sample_rate))
+        release_coef = np.exp(-1.0 / (self.release * sample_rate))
+        
+        # Simple envelope follower and gain reduction
+        envelope = 0.0
+        for i in range(len(output)):
+            input_level = abs(output[i])
+            
+            # Envelope follower
+            if input_level > envelope:
+                envelope = attack_coef * envelope + (1 - attack_coef) * input_level
+            else:
+                envelope = release_coef * envelope + (1 - release_coef) * input_level
+            
+            # Calculate gain reduction
+            if envelope > threshold_linear:
+                # Calculate compression
+                gain_reduction = threshold_linear + (envelope - threshold_linear) / self.ratio
+                output[i] = output[i] * (gain_reduction / max(envelope, 1e-10))
+        
+        # Apply makeup gain
+        output = output * self.makeup_gain
+        
+        return output
+
+
 class EffectChain:
     """
     Chain of audio effects to be applied in sequence.

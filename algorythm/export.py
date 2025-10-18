@@ -207,11 +207,29 @@ class Exporter:
             sample_rate: Sample rate in Hz
             quality: Quality setting
         """
-        # FLAC export would typically use a library like soundfile or pydub
-        # For now, export as WAV with a note that FLAC requires additional dependencies
-        print(f"Note: FLAC export requires additional dependencies. Exporting as WAV instead.")
-        wav_path = file_path.replace('.flac', '.wav')
-        self._export_wav(signal, wav_path, sample_rate, 24)
+        try:
+            import soundfile as sf
+            
+            # Ensure proper file extension
+            if not file_path.lower().endswith('.flac'):
+                file_path += '.flac'
+            
+            # Convert to 24-bit for FLAC
+            audio_data = np.clip(signal, -1.0, 1.0)
+            
+            # Write FLAC file
+            sf.write(file_path, audio_data, sample_rate, subtype='PCM_24')
+            
+        except ImportError:
+            print(f"Note: FLAC export requires soundfile library. Install with: pip install soundfile")
+            print(f"Exporting as WAV instead.")
+            wav_path = file_path.replace('.flac', '.wav')
+            self._export_wav(signal, wav_path, sample_rate, 24)
+        except Exception as e:
+            print(f"Error exporting FLAC: {e}")
+            print(f"Exporting as WAV instead.")
+            wav_path = file_path.replace('.flac', '.wav')
+            self._export_wav(signal, wav_path, sample_rate, 24)
     
     def _export_mp3(
         self,
@@ -229,11 +247,54 @@ class Exporter:
             sample_rate: Sample rate in Hz
             quality: Quality setting
         """
-        # MP3 export would typically use ffmpeg or lame
-        # For now, export as WAV with a note that MP3 requires additional dependencies
-        print(f"Note: MP3 export requires ffmpeg or lame. Exporting as WAV instead.")
-        wav_path = file_path.replace('.mp3', '.wav')
-        self._export_wav(signal, wav_path, sample_rate, 16)
+        try:
+            from pydub import AudioSegment
+            import tempfile
+            import os
+            
+            # Ensure proper file extension
+            if not file_path.lower().endswith('.mp3'):
+                file_path += '.mp3'
+            
+            # Convert to 16-bit PCM first (required for pydub)
+            audio_data = np.clip(signal * 32767, -32768, 32767).astype(np.int16)
+            
+            # Create temporary WAV file
+            with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_wav:
+                temp_wav_path = temp_wav.name
+                
+                with wave.open(temp_wav_path, 'wb') as wav_file:
+                    wav_file.setnchannels(1)
+                    wav_file.setsampwidth(2)
+                    wav_file.setframerate(sample_rate)
+                    wav_file.writeframes(audio_data.tobytes())
+            
+            # Convert to MP3 using pydub
+            audio = AudioSegment.from_wav(temp_wav_path)
+            
+            # Set bitrate based on quality
+            bitrate_map = {
+                'low': '128k',
+                'medium': '192k',
+                'high': '320k'
+            }
+            bitrate = bitrate_map.get(quality, '192k')
+            
+            audio.export(file_path, format='mp3', bitrate=bitrate)
+            
+            # Clean up temporary file
+            os.unlink(temp_wav_path)
+            
+        except ImportError:
+            print(f"Note: MP3 export requires pydub and ffmpeg. Install with: pip install pydub")
+            print(f"Exporting as WAV instead.")
+            wav_path = file_path.replace('.mp3', '.wav')
+            self._export_wav(signal, wav_path, sample_rate, 16)
+        except Exception as e:
+            print(f"Error exporting MP3: {e}")
+            print(f"Exporting as WAV instead.")
+            wav_path = file_path.replace('.mp3', '.wav')
+            self._export_wav(signal, wav_path, sample_rate, 16)
     
     def _export_ogg(
         self,
@@ -251,11 +312,54 @@ class Exporter:
             sample_rate: Sample rate in Hz
             quality: Quality setting
         """
-        # OGG export would typically use pydub or ffmpeg
-        # For now, export as WAV with a note that OGG requires additional dependencies
-        print(f"Note: OGG export requires additional dependencies. Exporting as WAV instead.")
-        wav_path = file_path.replace('.ogg', '.wav')
-        self._export_wav(signal, wav_path, sample_rate, 16)
+        try:
+            from pydub import AudioSegment
+            import tempfile
+            import os
+            
+            # Ensure proper file extension
+            if not file_path.lower().endswith('.ogg'):
+                file_path += '.ogg'
+            
+            # Convert to 16-bit PCM first
+            audio_data = np.clip(signal * 32767, -32768, 32767).astype(np.int16)
+            
+            # Create temporary WAV file
+            with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_wav:
+                temp_wav_path = temp_wav.name
+                
+                with wave.open(temp_wav_path, 'wb') as wav_file:
+                    wav_file.setnchannels(1)
+                    wav_file.setsampwidth(2)
+                    wav_file.setframerate(sample_rate)
+                    wav_file.writeframes(audio_data.tobytes())
+            
+            # Convert to OGG using pydub
+            audio = AudioSegment.from_wav(temp_wav_path)
+            
+            # Quality parameter for OGG (0-10, higher is better)
+            quality_map = {
+                'low': '3',
+                'medium': '6',
+                'high': '9'
+            }
+            ogg_quality = quality_map.get(quality, '6')
+            
+            audio.export(file_path, format='ogg', parameters=['-q:a', ogg_quality])
+            
+            # Clean up temporary file
+            os.unlink(temp_wav_path)
+            
+        except ImportError:
+            print(f"Note: OGG export requires pydub and ffmpeg. Install with: pip install pydub")
+            print(f"Exporting as WAV instead.")
+            wav_path = file_path.replace('.ogg', '.wav')
+            self._export_wav(signal, wav_path, sample_rate, 16)
+        except Exception as e:
+            print(f"Error exporting OGG: {e}")
+            print(f"Exporting as WAV instead.")
+            wav_path = file_path.replace('.ogg', '.wav')
+            self._export_wav(signal, wav_path, sample_rate, 16)
     
     def export_stereo(
         self,

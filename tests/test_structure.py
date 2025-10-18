@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 from algorythm.synth import Synth, SynthPresets
 from algorythm.sequence import Motif, Scale
-from algorythm.structure import Reverb, Delay, EffectChain, Track, Composition
+from algorythm.structure import Reverb, Delay, Chorus, Flanger, Distortion, Compression, EffectChain, Track, Composition
 
 
 class TestEffects:
@@ -28,6 +28,45 @@ class TestEffects:
         delay = Delay(delay_time=0.5, feedback=0.3, mix=0.3)
         assert delay.delay_time == 0.5
         assert delay.feedback == 0.3
+    
+    def test_flanger_creation(self):
+        """Test creating a flanger effect."""
+        flanger = Flanger(rate=0.5, depth=0.5, feedback=0.3, mix=0.5)
+        assert flanger.rate == 0.5
+        assert flanger.depth == 0.5
+    
+    def test_flanger_apply(self):
+        """Test applying flanger to signal."""
+        flanger = Flanger(rate=0.5, mix=0.5)
+        signal = np.random.randn(1000)
+        processed = flanger.apply(signal)
+        assert len(processed) == len(signal)
+    
+    def test_distortion_creation(self):
+        """Test creating a distortion effect."""
+        dist = Distortion(drive=0.5, tone=0.5, mix=1.0)
+        assert dist.drive == 0.5
+        assert dist.tone == 0.5
+    
+    def test_distortion_apply(self):
+        """Test applying distortion to signal."""
+        dist = Distortion(drive=0.5, mix=1.0)
+        signal = np.random.randn(1000) * 0.5
+        processed = dist.apply(signal)
+        assert len(processed) == len(signal)
+    
+    def test_compression_creation(self):
+        """Test creating a compression effect."""
+        comp = Compression(threshold=-20.0, ratio=4.0, attack=0.005, release=0.1)
+        assert comp.threshold == -20.0
+        assert comp.ratio == 4.0
+    
+    def test_compression_apply(self):
+        """Test applying compression to signal."""
+        comp = Compression(threshold=-20.0, ratio=4.0)
+        signal = np.random.randn(1000)
+        processed = comp.apply(signal)
+        assert len(processed) == len(signal)
 
 
 class TestEffectChain:
