@@ -311,3 +311,338 @@ class CellularAutomata:
         """
         np.random.seed(seed)
         return cls(width=width, height=height)
+
+
+class ConstraintBasedComposer:
+    """
+    Constraint-Based Composition (CBC) engine.
+    
+    Defines a formal set of musical rules and generates solutions that satisfy
+    all constraints (e.g., voice-leading rules, rhythmic limitations).
+    """
+    
+    def __init__(self, scale: Optional[Scale] = None):
+        """
+        Initialize a constraint-based composer.
+        
+        Args:
+            scale: Musical scale to use for composition
+        """
+        self.scale = scale or Scale.major('C', 4)
+        self.constraints: List[Callable[[List[int]], bool]] = []
+    
+    def add_constraint(self, constraint_func: Callable[[List[int]], bool]) -> 'ConstraintBasedComposer':
+        """
+        Add a constraint function that must be satisfied.
+        
+        Args:
+            constraint_func: Function that takes a melody (list of intervals) and returns True if valid
+            
+        Returns:
+            Self for method chaining
+        """
+        self.constraints.append(constraint_func)
+        return self
+    
+    def no_large_leaps(self, max_interval: int = 5) -> 'ConstraintBasedComposer':
+        """
+        Add constraint: no melodic leaps larger than max_interval.
+        
+        Args:
+            max_interval: Maximum allowed interval between consecutive notes
+            
+        Returns:
+            Self for method chaining
+        """
+        def constraint(melody: List[int]) -> bool:
+            for i in range(len(melody) - 1):
+                if abs(melody[i + 1] - melody[i]) > max_interval:
+                    return False
+            return True
+        
+        return self.add_constraint(constraint)
+    
+    def prefer_stepwise_motion(self) -> 'ConstraintBasedComposer':
+        """
+        Add constraint: prefer stepwise motion (intervals of 1-2 semitones).
+        
+        Returns:
+            Self for method chaining
+        """
+        def constraint(melody: List[int]) -> bool:
+            stepwise_count = 0
+            for i in range(len(melody) - 1):
+                if abs(melody[i + 1] - melody[i]) <= 2:
+                    stepwise_count += 1
+            # At least 70% stepwise motion
+            return stepwise_count >= len(melody) * 0.7
+        
+        return self.add_constraint(constraint)
+    
+    def no_repeated_notes(self) -> 'ConstraintBasedComposer':
+        """
+        Add constraint: no consecutive repeated notes.
+        
+        Returns:
+            Self for method chaining
+        """
+        def constraint(melody: List[int]) -> bool:
+            for i in range(len(melody) - 1):
+                if melody[i] == melody[i + 1]:
+                    return False
+            return True
+        
+        return self.add_constraint(constraint)
+    
+    def ending_on_tonic(self) -> 'ConstraintBasedComposer':
+        """
+        Add constraint: melody must end on the tonic (scale degree 0).
+        
+        Returns:
+            Self for method chaining
+        """
+        def constraint(melody: List[int]) -> bool:
+            return len(melody) > 0 and melody[-1] == 0
+        
+        return self.add_constraint(constraint)
+    
+    def check_constraints(self, melody: List[int]) -> bool:
+        """
+        Check if a melody satisfies all constraints.
+        
+        Args:
+            melody: List of scale degrees
+            
+        Returns:
+            True if all constraints are satisfied
+        """
+        return all(constraint(melody) for constraint in self.constraints)
+    
+    def generate(
+        self,
+        length: int = 8,
+        max_attempts: int = 1000
+    ) -> Optional[Motif]:
+        """
+        Generate a melody that satisfies all constraints.
+        
+        Args:
+            length: Desired melody length
+            max_attempts: Maximum number of generation attempts
+            
+        Returns:
+            Generated motif or None if no solution found
+        """
+        for _ in range(max_attempts):
+            # Generate random melody
+            melody = [np.random.randint(-7, 8) for _ in range(length)]
+            
+            # Check constraints
+            if self.check_constraints(melody):
+                return Motif(melody, self.scale)
+        
+        return None
+
+
+class GeneticAlgorithmImproviser:
+    """
+    Genetic Algorithm (GA) improviser for evolutionary music generation.
+    
+    Defines a numerical "fitness function" and uses evolutionary processes
+    (mutation, crossover) to iteratively generate motifs that optimize toward
+    the defined musical goal.
+    """
+    
+    def __init__(
+        self,
+        fitness_func: Callable[[List[int]], float],
+        scale: Optional[Scale] = None,
+        population_size: int = 50,
+        mutation_rate: float = 0.1,
+        crossover_rate: float = 0.7
+    ):
+        """
+        Initialize a genetic algorithm improviser.
+        
+        Args:
+            fitness_func: Function that scores a melody (higher is better)
+            scale: Musical scale to use
+            population_size: Number of individuals in population
+            mutation_rate: Probability of mutation
+            crossover_rate: Probability of crossover
+        """
+        self.fitness_func = fitness_func
+        self.scale = scale or Scale.major('C', 4)
+        self.population_size = population_size
+        self.mutation_rate = mutation_rate
+        self.crossover_rate = crossover_rate
+        self.population: List[List[int]] = []
+    
+    def initialize_population(self, length: int, range_min: int = -7, range_max: int = 8) -> None:
+        """
+        Initialize random population.
+        
+        Args:
+            length: Length of each melody
+            range_min: Minimum interval value
+            range_max: Maximum interval value
+        """
+        self.population = [
+            [np.random.randint(range_min, range_max) for _ in range(length)]
+            for _ in range(self.population_size)
+        ]
+    
+    def evaluate_fitness(self, individual: List[int]) -> float:
+        """
+        Evaluate fitness of an individual.
+        
+        Args:
+            individual: Melody to evaluate
+            
+        Returns:
+            Fitness score
+        """
+        return self.fitness_func(individual)
+    
+    def select_parents(self) -> tuple:
+        """
+        Select two parents using tournament selection.
+        
+        Returns:
+            Tuple of two parent melodies
+        """
+        # Tournament selection
+        tournament_size = 5
+        
+        def tournament() -> List[int]:
+            competitors = [self.population[np.random.randint(0, len(self.population))]
+                          for _ in range(tournament_size)]
+            return max(competitors, key=self.evaluate_fitness)
+        
+        return tournament(), tournament()
+    
+    def crossover(self, parent1: List[int], parent2: List[int]) -> tuple:
+        """
+        Perform single-point crossover between two parents.
+        
+        Args:
+            parent1: First parent melody
+            parent2: Second parent melody
+            
+        Returns:
+            Tuple of two offspring melodies
+        """
+        if np.random.random() > self.crossover_rate:
+            return parent1.copy(), parent2.copy()
+        
+        point = np.random.randint(1, len(parent1))
+        child1 = parent1[:point] + parent2[point:]
+        child2 = parent2[:point] + parent1[point:]
+        
+        return child1, child2
+    
+    def mutate(self, individual: List[int]) -> List[int]:
+        """
+        Mutate an individual by randomly changing some notes.
+        
+        Args:
+            individual: Melody to mutate
+            
+        Returns:
+            Mutated melody
+        """
+        mutated = individual.copy()
+        
+        for i in range(len(mutated)):
+            if np.random.random() < self.mutation_rate:
+                mutated[i] += np.random.randint(-2, 3)
+                mutated[i] = np.clip(mutated[i], -14, 14)
+        
+        return mutated
+    
+    def evolve(self, generations: int = 100) -> Motif:
+        """
+        Evolve the population over multiple generations.
+        
+        Args:
+            generations: Number of generations to evolve
+            
+        Returns:
+            Best motif found
+        """
+        for generation in range(generations):
+            # Evaluate all individuals
+            fitness_scores = [self.evaluate_fitness(ind) for ind in self.population]
+            
+            # Create new population
+            new_population = []
+            
+            # Elitism: keep best individual
+            best_idx = np.argmax(fitness_scores)
+            new_population.append(self.population[best_idx])
+            
+            # Generate rest of new population
+            while len(new_population) < self.population_size:
+                parent1, parent2 = self.select_parents()
+                child1, child2 = self.crossover(parent1, parent2)
+                child1 = self.mutate(child1)
+                child2 = self.mutate(child2)
+                
+                new_population.append(child1)
+                if len(new_population) < self.population_size:
+                    new_population.append(child2)
+            
+            self.population = new_population
+        
+        # Return best individual as motif
+        fitness_scores = [self.evaluate_fitness(ind) for ind in self.population]
+        best_idx = np.argmax(fitness_scores)
+        best_melody = self.population[best_idx]
+        
+        return Motif(best_melody, self.scale)
+    
+    @staticmethod
+    def fitness_ascending() -> Callable[[List[int]], float]:
+        """
+        Fitness function that prefers ascending melodies.
+        
+        Returns:
+            Fitness function
+        """
+        def fitness(melody: List[int]) -> float:
+            ascending_count = sum(1 for i in range(len(melody) - 1) if melody[i + 1] > melody[i])
+            return ascending_count / max(len(melody) - 1, 1)
+        
+        return fitness
+    
+    @staticmethod
+    def fitness_contour(target_contour: List[int]) -> Callable[[List[int]], float]:
+        """
+        Fitness function that matches a target melodic contour.
+        
+        Args:
+            target_contour: List of +1 (ascending), -1 (descending), 0 (same)
+            
+        Returns:
+            Fitness function
+        """
+        def fitness(melody: List[int]) -> float:
+            if len(melody) < 2:
+                return 0.0
+            
+            contour = []
+            for i in range(len(melody) - 1):
+                if melody[i + 1] > melody[i]:
+                    contour.append(1)
+                elif melody[i + 1] < melody[i]:
+                    contour.append(-1)
+                else:
+                    contour.append(0)
+            
+            # Calculate similarity to target
+            min_len = min(len(contour), len(target_contour))
+            matches = sum(1 for i in range(min_len) if contour[i] == target_contour[i])
+            
+            return matches / max(len(target_contour), 1)
+        
+        return fitness

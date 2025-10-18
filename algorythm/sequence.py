@@ -5,15 +5,128 @@ This module provides tools for creating musical sequences, motifs, rhythms,
 and arpeggios.
 """
 
-from typing import List, Optional, Literal
+from typing import List, Optional, Literal, Union
 import numpy as np
+
+
+class Tuning:
+    """
+    Global tuning system for microtonal and alternative temperaments.
+    
+    Supports custom tunings, equal temperaments (e.g., 19-TET), and historical tunings.
+    """
+    
+    # Pre-defined tuning systems (in cents, where 100 cents = 1 semitone)
+    TUNINGS = {
+        '12-TET': [i * 100 for i in range(12)],  # Standard 12-tone equal temperament
+        '19-TET': [i * (1200 / 19) for i in range(19)],  # 19-tone equal temperament
+        '24-TET': [i * 50 for i in range(24)],  # Quarter-tone system
+        'just_intonation': [0, 111.73, 203.91, 315.64, 386.31, 498.04, 582.51, 701.96, 813.69, 884.36, 1017.60, 1088.27],
+        'pythagorean': [0, 90.22, 203.91, 294.13, 407.82, 498.04, 588.27, 701.96, 792.18, 905.87, 996.09, 1109.78],
+    }
+    
+    def __init__(
+        self,
+        tuning_system: Union[str, List[float]] = '12-TET',
+        reference_frequency: float = 440.0,
+        reference_note: int = 69  # A4 in MIDI
+    ):
+        """
+        Initialize a tuning system.
+        
+        Args:
+            tuning_system: Name of predefined tuning or list of cents values per octave
+            reference_frequency: Reference frequency in Hz (default A4 = 440 Hz)
+            reference_note: MIDI note number of reference frequency
+        """
+        self.reference_frequency = reference_frequency
+        self.reference_note = reference_note
+        
+        if isinstance(tuning_system, str):
+            if tuning_system not in self.TUNINGS:
+                raise ValueError(f"Unknown tuning system: {tuning_system}")
+            self.cents = self.TUNINGS[tuning_system]
+            self.name = tuning_system
+        else:
+            self.cents = tuning_system
+            self.name = 'custom'
+        
+        self.tones_per_octave = len(self.cents)
+    
+    @classmethod
+    def equal_temperament(cls, divisions: int) -> 'Tuning':
+        """
+        Create an equal temperament tuning with N divisions per octave.
+        
+        Args:
+            divisions: Number of equal divisions per octave
+            
+        Returns:
+            Tuning instance
+        """
+        cents = [i * (1200 / divisions) for i in range(divisions)]
+        return cls(tuning_system=cents)
+    
+    @classmethod
+    def just_intonation(cls) -> 'Tuning':
+        """Create a just intonation tuning."""
+        return cls('just_intonation')
+    
+    @classmethod
+    def pythagorean(cls) -> 'Tuning':
+        """Create a Pythagorean tuning."""
+        return cls('pythagorean')
+    
+    def get_frequency(self, degree: int) -> float:
+        """
+        Get frequency for a scale degree in this tuning.
+        
+        Args:
+            degree: Scale degree (can span multiple octaves)
+            
+        Returns:
+            Frequency in Hz
+        """
+        octave = degree // self.tones_per_octave
+        tone = degree % self.tones_per_octave
+        
+        # Calculate cents from reference
+        cents_from_ref = self.cents[tone] + (octave * 1200)
+        
+        # Convert cents to frequency ratio: 2^(cents/1200)
+        ratio = 2 ** (cents_from_ref / 1200)
+        
+        return self.reference_frequency * ratio
+    
+    def midi_to_frequency(self, midi_note: int) -> float:
+        """
+        Convert MIDI note to frequency using this tuning.
+        
+        Args:
+            midi_note: MIDI note number
+            
+        Returns:
+            Frequency in Hz
+        """
+        # Calculate distance from reference note in scale degrees
+        semitones_from_ref = midi_note - self.reference_note
+        
+        # For standard 12-TET, this is straightforward
+        if self.tones_per_octave == 12:
+            degree = semitones_from_ref
+        else:
+            # Map 12-TET semitones to this tuning's degrees
+            # This is an approximation for non-12-TET systems
+            degree = int(semitones_from_ref * self.tones_per_octave / 12)
+        
+        return self.get_frequency(degree)
 
 
 class Scale:
     """
     Musical scale definitions and operations.
     
-    Provides various scale types and key transpositions.
+    Provides various scale types and key transpositions with microtonal support.
     """
     
     # Scale intervals in semitones from root
@@ -35,7 +148,13 @@ class Scale:
         'Ab': 8, 'A': 9, 'A#': 10, 'Bb': 10, 'B': 11,
     }
     
-    def __init__(self, root: str, scale_type: str = 'major', octave: int = 4):
+    def __init__(
+        self,
+        root: str,
+        scale_type: str = 'major',
+        octave: int = 4,
+        tuning: Optional[Tuning] = None
+    ):
         """
         Initialize a scale.
         
@@ -43,10 +162,12 @@ class Scale:
             root: Root note name (e.g., 'C', 'D#', 'Bb')
             scale_type: Type of scale (e.g., 'major', 'minor')
             octave: Base octave number
+            tuning: Optional custom tuning system (default: 12-TET)
         """
         self.root = root
         self.scale_type = scale_type
         self.octave = octave
+        self.tuning = tuning or Tuning('12-TET')
         
         if scale_type not in self.SCALES:
             raise ValueError(f"Unknown scale type: {scale_type}")
@@ -58,29 +179,29 @@ class Scale:
         self.root_midi = self.NOTE_NAMES[root] + (octave * 12) + 12  # +12 for MIDI offset
     
     @classmethod
-    def major(cls, root: str, octave: int = 4) -> 'Scale':
+    def major(cls, root: str, octave: int = 4, tuning: Optional[Tuning] = None) -> 'Scale':
         """Create a major scale."""
-        return cls(root, 'major', octave)
+        return cls(root, 'major', octave, tuning)
     
     @classmethod
-    def minor(cls, root: str, octave: int = 4) -> 'Scale':
+    def minor(cls, root: str, octave: int = 4, tuning: Optional[Tuning] = None) -> 'Scale':
         """Create a minor scale."""
-        return cls(root, 'minor', octave)
+        return cls(root, 'minor', octave, tuning)
     
     @classmethod
-    def pentatonic_major(cls, root: str, octave: int = 4) -> 'Scale':
+    def pentatonic_major(cls, root: str, octave: int = 4, tuning: Optional[Tuning] = None) -> 'Scale':
         """Create a pentatonic major scale."""
-        return cls(root, 'pentatonic_major', octave)
+        return cls(root, 'pentatonic_major', octave, tuning)
     
     @classmethod
-    def pentatonic_minor(cls, root: str, octave: int = 4) -> 'Scale':
+    def pentatonic_minor(cls, root: str, octave: int = 4, tuning: Optional[Tuning] = None) -> 'Scale':
         """Create a pentatonic minor scale."""
-        return cls(root, 'pentatonic_minor', octave)
+        return cls(root, 'pentatonic_minor', octave, tuning)
     
     @classmethod
-    def blues(cls, root: str, octave: int = 4) -> 'Scale':
+    def blues(cls, root: str, octave: int = 4, tuning: Optional[Tuning] = None) -> 'Scale':
         """Create a blues scale."""
-        return cls(root, 'blues', octave)
+        return cls(root, 'blues', octave, tuning)
     
     def get_note(self, degree: int) -> int:
         """
@@ -109,8 +230,8 @@ class Scale:
             Frequency in Hz
         """
         midi_note = self.get_note(degree)
-        # Convert MIDI note to frequency: f = 440 * 2^((n-69)/12)
-        return 440.0 * (2.0 ** ((midi_note - 69) / 12.0))
+        # Use the tuning system to convert MIDI note to frequency
+        return self.tuning.midi_to_frequency(midi_note)
 
 
 class Motif:

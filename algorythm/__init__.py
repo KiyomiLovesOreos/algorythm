@@ -7,13 +7,13 @@ A declarative, Manim-inspired library for generating algorithmic music.
 __version__ = '0.1.0'
 
 from algorythm.synth import Synth, Oscillator, Filter, ADSR, SynthPresets
-from algorythm.sequence import Motif, Rhythm, Arpeggiator, Scale, Chord
-from algorythm.structure import Track, Composition, EffectChain, Reverb, Delay, Chorus, Flanger, Distortion, Compression
+from algorythm.sequence import Motif, Rhythm, Arpeggiator, Scale, Chord, Tuning
+from algorythm.structure import Track, Composition, EffectChain, Reverb, Delay, Chorus, Flanger, Distortion, Compression, SpatialAudio
 from algorythm.export import RenderEngine, Exporter
-from algorythm.generative import LSystem, CellularAutomata
+from algorythm.generative import LSystem, CellularAutomata, ConstraintBasedComposer, GeneticAlgorithmImproviser
 from algorythm.automation import Automation, AutomationTrack, DataSonification
-from algorythm.visualization import WaveformVisualizer, SpectrogramVisualizer, FrequencyScopeVisualizer, VideoRenderer
-from algorythm.sampler import Sample, Sampler
+from algorythm.visualization import WaveformVisualizer, SpectrogramVisualizer, FrequencyScopeVisualizer, VideoRenderer, OscilloscopeVisualizer, PianoRollVisualizer
+from algorythm.sampler import Sample, Sampler, GranularSynth
 
 __all__ = [
     # Synthesis
@@ -28,6 +28,7 @@ __all__ = [
     'Arpeggiator',
     'Scale',
     'Chord',
+    'Tuning',
     # Structure
     'Track',
     'Composition',
@@ -38,12 +39,15 @@ __all__ = [
     'Flanger',
     'Distortion',
     'Compression',
+    'SpatialAudio',
     # Export
     'RenderEngine',
     'Exporter',
     # Generative
     'LSystem',
     'CellularAutomata',
+    'ConstraintBasedComposer',
+    'GeneticAlgorithmImproviser',
     # Automation
     'Automation',
     'AutomationTrack',
@@ -53,7 +57,10 @@ __all__ = [
     'SpectrogramVisualizer',
     'FrequencyScopeVisualizer',
     'VideoRenderer',
+    'OscilloscopeVisualizer',
+    'PianoRollVisualizer',
     # Sampler
     'Sample',
     'Sampler',
+    'GranularSynth',
 ]

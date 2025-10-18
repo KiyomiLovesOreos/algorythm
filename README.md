@@ -138,11 +138,24 @@ bass = SynthPresets.bass()
 
 ### Sequence Module
 
+**Tuning**: Microtonal and alternative temperament support
+```python
+from algorythm.sequence import Tuning, Scale
+# 19-tone equal temperament
+tuning = Tuning.equal_temperament(19)
+# Just intonation
+tuning_ji = Tuning.just_intonation()
+# Use with scales
+scale = Scale.major('C', octave=4, tuning=tuning)
+```
+
 **Scale**: Musical scale definitions
 ```python
 from algorythm.sequence import Scale
 c_major = Scale.major('C', octave=4)
 a_minor = Scale.minor('A', octave=3)
+# With custom tuning
+scale_19tet = Scale.major('C', octave=4, tuning=Tuning.equal_temperament(19))
 ```
 
 **Chord**: Musical chord definitions
@@ -191,6 +204,14 @@ distortion = Distortion(drive=0.7, tone=0.5, mix=1.0)
 compression = Compression(threshold=-20.0, ratio=4.0, attack=0.005, release=0.1)
 ```
 
+**SpatialAudio**: 3D positioning and spatial audio mixing
+```python
+from algorythm.structure import SpatialAudio
+spatial = SpatialAudio(position=(2.0, 1.0, 0.0))
+spatial.set_position(x=3.0, y=0.5, z=-1.0)
+stereo_output = spatial.apply(mono_signal)  # Returns stereo with panning and distance attenuation
+```
+
 ### Export Module
 
 **Exporter**: Exports audio to various formats (WAV, FLAC, MP3, OGG)
@@ -221,6 +242,25 @@ ca = CellularAutomata(width=16, height=8)
 ca.evolve()
 motif = ca.to_motif(row=-1)  # Convert last row to motif
 rhythm = ca.to_rhythm_pattern(row=-1)  # Convert to rhythm
+```
+
+**ConstraintBasedComposer**: Generate melodies that satisfy musical rules
+```python
+from algorythm.generative import ConstraintBasedComposer
+composer = ConstraintBasedComposer(scale=Scale.major('C'))
+composer.no_large_leaps(max_interval=4).ending_on_tonic()
+motif = composer.generate(length=8)
+```
+
+**GeneticAlgorithmImproviser**: Evolve melodies using genetic algorithms
+```python
+from algorythm.generative import GeneticAlgorithmImproviser
+
+# Define fitness function (prefer ascending melodies)
+fitness = GeneticAlgorithmImproviser.fitness_ascending()
+ga = GeneticAlgorithmImproviser(fitness, population_size=50)
+ga.initialize_population(length=8)
+motif = ga.evolve(generations=100)
 ```
 
 ### Automation Module
@@ -283,6 +323,22 @@ viz = WaveformVisualizer()
 frames = renderer.render_frames(audio_signal, viz, output_path='output.mp4')
 ```
 
+**OscilloscopeVisualizer**: Real-time waveform and phase scope
+```python
+from algorythm.visualization import OscilloscopeVisualizer
+viz = OscilloscopeVisualizer(mode='lissajous')  # 'waveform', 'lissajous', 'phase'
+image = viz.to_image_data(stereo_signal, height=512, width=512)
+```
+
+**PianoRollVisualizer**: Musical note display on a grid
+```python
+from algorythm.visualization import PianoRollVisualizer
+viz = PianoRollVisualizer()
+viz.add_note(midi_note=60, start_time=0.0, duration=0.5)
+viz.add_note(midi_note=64, start_time=0.5, duration=0.5)
+image = viz.to_image_data(duration=2.0, height=480, width=640)
+```
+
 ### Sampler Module
 
 **Sample**: Load and manipulate audio samples
@@ -306,6 +362,18 @@ output = sampler.trigger(pitch_shift=12.0, volume=0.8)
 output = sampler.trigger_note(frequency=440.0, base_frequency=220.0)
 # Create loops
 looped = sampler.create_loop(num_loops=4, fade_time=0.01)
+```
+
+**GranularSynth**: Granular synthesis for rich textures
+```python
+from algorythm.sampler import GranularSynth
+granular = GranularSynth.from_file('sample.wav', grain_size=0.05, grain_density=20.0)
+output = granular.synthesize(
+    duration=5.0,
+    position_range=(0.2, 0.8),
+    pitch_range=(-12.0, 12.0),
+    spatial_spread=0.5
+)
 ```
 
 ## Technical Considerations

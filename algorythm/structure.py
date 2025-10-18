@@ -5,7 +5,7 @@ This module provides high-level composition tools for arranging tracks,
 applying effects, and creating complete musical pieces.
 """
 
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Literal
 import numpy as np
 from algorythm.synth import Synth
 from algorythm.sequence import Motif
@@ -370,6 +370,134 @@ class EffectChain:
         for effect in self.effects:
             output = effect.apply(output, sample_rate)
         return output
+
+
+class SpatialAudio:
+    """
+    Spatial audio mixer for 3D positioning of sound sources.
+    
+    Programmatically controls the 3D position (X/Y/Z) of any sound source,
+    automating panning and volume based on virtual distance.
+    """
+    
+    def __init__(
+        self,
+        position: tuple = (0.0, 0.0, 0.0),
+        listener_position: tuple = (0.0, 0.0, 0.0),
+        distance_model: Literal['linear', 'inverse', 'exponential'] = 'inverse'
+    ):
+        """
+        Initialize spatial audio positioning.
+        
+        Args:
+            position: 3D position of sound source (x, y, z)
+            listener_position: 3D position of listener
+            distance_model: Distance attenuation model
+        """
+        self.position = np.array(position)
+        self.listener_position = np.array(listener_position)
+        self.distance_model = distance_model
+        self.max_distance = 10.0  # Maximum audible distance
+        self.reference_distance = 1.0  # Reference distance for attenuation
+    
+    def set_position(self, x: float, y: float, z: float) -> None:
+        """
+        Set the 3D position of the sound source.
+        
+        Args:
+            x: X coordinate
+            y: Y coordinate
+            z: Z coordinate
+        """
+        self.position = np.array([x, y, z])
+    
+    def set_listener_position(self, x: float, y: float, z: float) -> None:
+        """
+        Set the 3D position of the listener.
+        
+        Args:
+            x: X coordinate
+            y: Y coordinate
+            z: Z coordinate
+        """
+        self.listener_position = np.array([x, y, z])
+    
+    def calculate_distance(self) -> float:
+        """
+        Calculate distance between source and listener.
+        
+        Returns:
+            Distance in 3D space
+        """
+        return np.linalg.norm(self.position - self.listener_position)
+    
+    def calculate_pan(self) -> float:
+        """
+        Calculate stereo pan position based on X position.
+        
+        Returns:
+            Pan value (-1.0 = left, 0.0 = center, 1.0 = right)
+        """
+        # Calculate relative X position
+        relative_x = self.position[0] - self.listener_position[0]
+        
+        # Normalize to pan range
+        pan = np.clip(relative_x / self.max_distance, -1.0, 1.0)
+        
+        return pan
+    
+    def calculate_attenuation(self) -> float:
+        """
+        Calculate volume attenuation based on distance.
+        
+        Returns:
+            Attenuation factor (0.0 to 1.0)
+        """
+        distance = self.calculate_distance()
+        
+        if distance <= self.reference_distance:
+            return 1.0
+        
+        if self.distance_model == 'linear':
+            # Linear distance model
+            attenuation = 1.0 - (distance - self.reference_distance) / (self.max_distance - self.reference_distance)
+        elif self.distance_model == 'inverse':
+            # Inverse distance model
+            attenuation = self.reference_distance / distance
+        elif self.distance_model == 'exponential':
+            # Exponential distance model
+            attenuation = (self.reference_distance / distance) ** 2
+        else:
+            attenuation = 1.0
+        
+        return np.clip(attenuation, 0.0, 1.0)
+    
+    def apply(self, signal: np.ndarray, sample_rate: int = 44100) -> np.ndarray:
+        """
+        Apply spatial audio processing to signal.
+        
+        Args:
+            signal: Mono input audio signal
+            sample_rate: Sample rate in Hz
+            
+        Returns:
+            Stereo audio signal with spatial positioning
+        """
+        # Calculate pan and attenuation
+        pan = self.calculate_pan()
+        attenuation = self.calculate_attenuation()
+        
+        # Apply attenuation
+        processed = signal * attenuation
+        
+        # Create stereo output
+        left_gain = np.sqrt((1.0 - pan) / 2.0)
+        right_gain = np.sqrt((1.0 + pan) / 2.0)
+        
+        # Create stereo signal (2, N) shape
+        stereo = np.vstack([processed * left_gain, processed * right_gain])
+        
+        return stereo
 
 
 class Track:
