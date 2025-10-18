@@ -1,1 +1,1 @@
-"""Tests for audionaut library."""
+"""Tests for algorythm library."""
