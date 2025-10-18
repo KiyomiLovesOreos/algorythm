@@ -10,11 +10,11 @@ with open("README.md", "r", encoding="utf-8") as fh:
 setup(
     name="algorythm",
     version="0.1.0",
-    author="Algorythm Contributors",
+    author="KiyomiLovesOreos",
     description="A Python Library for Algorithmic Music - Manim-inspired declarative audio synthesis",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/KiyomiLovesOreos/synthesia",
+    url="https://github.com/KiyomiLovesOreos/algorythm",
     packages=find_packages(),
     classifiers=[
         "Development Status :: 3 - Alpha",
