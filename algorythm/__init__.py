@@ -4,16 +4,33 @@ Algorythm: A Python Library for Algorithmic Music
 A declarative, Manim-inspired library for generating algorithmic music.
 """
 
-__version__ = '0.1.0'
+__version__ = '0.3.0'
 
-from algorythm.synth import Synth, Oscillator, Filter, ADSR, SynthPresets
+from algorythm.synth import Synth, Oscillator, Filter, ADSR, SynthPresets, FMSynth, WavetableSynth
 from algorythm.sequence import Motif, Rhythm, Arpeggiator, Scale, Chord, Tuning
-from algorythm.structure import Track, Composition, EffectChain, Reverb, Delay, Chorus, Flanger, Distortion, Compression, SpatialAudio
+from algorythm.structure import (
+    Track, Composition, EffectChain, 
+    Reverb, Delay, Chorus, Flanger, Distortion, Compression, 
+    EQ, Phaser, Tremolo, Bitcrusher, SpatialAudio, VolumeControl
+)
 from algorythm.export import RenderEngine, Exporter
 from algorythm.generative import LSystem, CellularAutomata, ConstraintBasedComposer, GeneticAlgorithmImproviser
 from algorythm.automation import Automation, AutomationTrack, DataSonification
 from algorythm.visualization import WaveformVisualizer, SpectrogramVisualizer, FrequencyScopeVisualizer, VideoRenderer, OscilloscopeVisualizer, PianoRollVisualizer
 from algorythm.sampler import Sample, Sampler, GranularSynth
+
+# Optional imports (require additional dependencies)
+try:
+    from algorythm.playback import AudioPlayer, StreamingPlayer, LiveCompositionPlayer
+    _PLAYBACK_AVAILABLE = True
+except ImportError:
+    _PLAYBACK_AVAILABLE = False
+
+try:
+    from algorythm.live_gui import LiveCodingGUI, launch
+    _GUI_AVAILABLE = True
+except ImportError:
+    _GUI_AVAILABLE = False
 
 __all__ = [
     # Synthesis
@@ -22,6 +39,8 @@ __all__ = [
     'Filter',
     'ADSR',
     'SynthPresets',
+    'FMSynth',
+    'WavetableSynth',
     # Sequence
     'Motif',
     'Rhythm',
@@ -39,7 +58,12 @@ __all__ = [
     'Flanger',
     'Distortion',
     'Compression',
+    'EQ',
+    'Phaser',
+    'Tremolo',
+    'Bitcrusher',
     'SpatialAudio',
+    'VolumeControl',
     # Export
     'RenderEngine',
     'Exporter',
@@ -64,3 +88,11 @@ __all__ = [
     'Sampler',
     'GranularSynth',
 ]
+
+# Add playback to __all__ if available
+if _PLAYBACK_AVAILABLE:
+    __all__.extend(['AudioPlayer', 'StreamingPlayer', 'LiveCompositionPlayer'])
+
+# Add GUI to __all__ if available
+if _GUI_AVAILABLE:
+    __all__.extend(['LiveCodingGUI', 'launch'])

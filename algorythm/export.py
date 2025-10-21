@@ -8,6 +8,8 @@ import numpy as np
 from typing import Optional, Literal
 import wave
 import struct
+import os
+from pathlib import Path
 
 
 class RenderEngine:
@@ -106,11 +108,45 @@ class Exporter:
     Exports audio to various file formats.
     
     Supports WAV, FLAC, MP3, and OGG formats.
+    By default, files are saved to ~/Music directory.
     """
     
-    def __init__(self):
-        """Initialize the exporter."""
+    def __init__(self, default_directory: Optional[str] = None):
+        """
+        Initialize the exporter.
+        
+        Args:
+            default_directory: Default directory for exports. If None, uses ~/Music
+        """
         self.render_engine = RenderEngine()
+        
+        if default_directory is None:
+            # Default to ~/Music
+            self.default_directory = Path.home() / "Music"
+        else:
+            self.default_directory = Path(default_directory)
+        
+        # Create directory if it doesn't exist
+        self.default_directory.mkdir(parents=True, exist_ok=True)
+    
+    def _resolve_path(self, file_path: str) -> str:
+        """
+        Resolve file path, using default directory if path is relative.
+        
+        Args:
+            file_path: File path (can be absolute or relative)
+            
+        Returns:
+            Absolute file path
+        """
+        path = Path(file_path)
+        
+        # If absolute path, use as-is
+        if path.is_absolute():
+            return str(path)
+        
+        # If relative path, prepend default directory
+        return str(self.default_directory / file_path)
     
     def export(
         self,
@@ -125,11 +161,17 @@ class Exporter:
         
         Args:
             signal: Audio signal to export
-            file_path: Output file path
+            file_path: Output file path (relative paths use ~/Music directory)
             sample_rate: Sample rate in Hz
             quality: Quality setting
             bit_depth: Bit depth for WAV export
         """
+        # Resolve path (use ~/Music for relative paths)
+        file_path = self._resolve_path(file_path)
+        
+        # Create parent directory if it doesn't exist
+        Path(file_path).parent.mkdir(parents=True, exist_ok=True)
+        
         # Normalize signal
         signal = self.render_engine.normalize(signal)
         
@@ -147,6 +189,8 @@ class Exporter:
         else:
             # Default to WAV if no recognized extension
             self._export_wav(signal, file_path, sample_rate, bit_depth)
+        
+        print(f"Exported to: {file_path}")
     
     def _export_wav(
         self,
@@ -376,11 +420,17 @@ class Exporter:
         Args:
             left_signal: Left channel audio signal
             right_signal: Right channel audio signal
-            file_path: Output file path
+            file_path: Output file path (relative paths use ~/Music directory)
             sample_rate: Sample rate in Hz
             quality: Quality setting
             bit_depth: Bit depth for WAV export
         """
+        # Resolve path (use ~/Music for relative paths)
+        file_path = self._resolve_path(file_path)
+        
+        # Create parent directory if it doesn't exist
+        Path(file_path).parent.mkdir(parents=True, exist_ok=True)
+        
         # Normalize both channels
         left_signal = self.render_engine.normalize(left_signal)
         right_signal = self.render_engine.normalize(right_signal)
@@ -403,6 +453,8 @@ class Exporter:
         else:
             print(f"Stereo export currently only supports WAV format.")
             self._export_wav_stereo(stereo_signal, file_path, sample_rate, bit_depth)
+        
+        print(f"Exported to: {file_path}")
     
     def _export_wav_stereo(
         self,

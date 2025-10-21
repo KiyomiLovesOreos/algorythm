@@ -77,12 +77,34 @@ Key concepts:
 - Multiple effects: `Delay` and `Reverb`
 - Multi-track composition
 
+### volume_control_demo.py
+
+Demonstrates comprehensive volume control features:
+- Track-level volume control
+- Master volume for entire composition
+- Fade in/out effects
+- VolumeControl utility functions
+- dB to linear conversions
+- Volume normalization
+- Different fade curve types (linear, exponential, logarithmic)
+
+Key concepts:
+- `set_track_volume()` for individual track control
+- `set_master_volume()` for composition-wide control
+- `VolumeControl` utility class
+- `fade_in()` and `fade_out()` methods
+- Volume conversion between dB and linear
+
 ## Generated Files
 
 Running these examples will create WAV files:
 - `warm_pad.wav` - Single warm pad note
 - `epic_track.wav` - Full composition with melody
 - `advanced_track.wav` - Multi-track composition
+- `volume_demo.wav` - Multi-track composition with volume control
+- `fade_linear_demo.wav` - Linear fade curve demonstration
+- `fade_exponential_demo.wav` - Exponential fade curve demonstration
+- `fade_logarithmic_demo.wav` - Logarithmic fade curve demonstration
 
 **Note:** Generated audio files are excluded from git (see `.gitignore`).
 

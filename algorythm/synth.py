@@ -6,7 +6,7 @@ filters, envelopes, and synth presets.
 """
 
 import numpy as np
-from typing import Optional, Literal
+from typing import Optional, Literal, List
 
 
 class Oscillator:
@@ -305,3 +305,251 @@ class Synth:
         signal = signal * envelope
         
         return signal
+
+
+class FMSynth:
+    """
+    FM (Frequency Modulation) Synthesizer for complex harmonic sounds.
+    
+    Uses one oscillator to modulate the frequency of another, creating
+    rich, metallic, and bell-like timbres.
+    """
+    
+    def __init__(
+        self,
+        carrier_waveform: Literal['sine', 'square', 'saw', 'triangle'] = 'sine',
+        modulator_waveform: Literal['sine', 'square', 'saw', 'triangle'] = 'sine',
+        modulation_index: float = 2.0,
+        mod_freq_ratio: float = 2.0,
+        envelope: Optional[ADSR] = None,
+        filter: Optional[Filter] = None
+    ):
+        """
+        Initialize an FM synthesizer.
+        
+        Args:
+            carrier_waveform: Carrier oscillator waveform
+            modulator_waveform: Modulator oscillator waveform
+            modulation_index: FM modulation index (amount of modulation)
+            mod_freq_ratio: Modulator frequency as ratio of carrier frequency
+            envelope: Optional ADSR envelope
+            filter: Optional filter to apply
+        """
+        self.carrier_waveform = carrier_waveform
+        self.modulator_waveform = modulator_waveform
+        self.modulation_index = modulation_index
+        self.mod_freq_ratio = mod_freq_ratio
+        self.envelope = envelope or ADSR(attack=0.01, decay=0.3, sustain=0.5, release=0.5)
+        self.filter = filter
+    
+    def generate_note(
+        self,
+        frequency: float,
+        duration: float,
+        sample_rate: int = 44100
+    ) -> np.ndarray:
+        """
+        Generate a single FM synthesized note.
+        
+        Args:
+            frequency: Carrier frequency in Hz
+            duration: Duration in seconds
+            sample_rate: Sample rate in Hz
+            
+        Returns:
+            NumPy array of audio samples
+        """
+        num_samples = int(duration * sample_rate)
+        t = np.linspace(0, duration, num_samples, endpoint=False)
+        
+        # Modulator frequency
+        mod_freq = frequency * self.mod_freq_ratio
+        
+        # Generate modulator signal
+        if self.modulator_waveform == 'sine':
+            modulator = np.sin(2 * np.pi * mod_freq * t)
+        elif self.modulator_waveform == 'square':
+            modulator = np.sign(np.sin(2 * np.pi * mod_freq * t))
+        elif self.modulator_waveform == 'saw':
+            modulator = 2 * (t * mod_freq - np.floor(0.5 + t * mod_freq))
+        elif self.modulator_waveform == 'triangle':
+            modulator = 2 * np.abs(2 * (t * mod_freq - np.floor(0.5 + t * mod_freq))) - 1
+        else:
+            modulator = np.sin(2 * np.pi * mod_freq * t)
+        
+        # FM synthesis: carrier frequency modulated by modulator
+        modulation = frequency * self.modulation_index * modulator
+        
+        # Generate carrier with modulated frequency
+        if self.carrier_waveform == 'sine':
+            signal = np.sin(2 * np.pi * frequency * t + modulation)
+        elif self.carrier_waveform == 'square':
+            signal = np.sign(np.sin(2 * np.pi * frequency * t + modulation))
+        elif self.carrier_waveform == 'saw':
+            # For saw, apply modulation differently
+            phase = (frequency * t + self.modulation_index * np.sin(2 * np.pi * mod_freq * t) / (2 * np.pi))
+            signal = 2 * (phase - np.floor(0.5 + phase))
+        elif self.carrier_waveform == 'triangle':
+            phase = (frequency * t + self.modulation_index * np.sin(2 * np.pi * mod_freq * t) / (2 * np.pi))
+            signal = 2 * np.abs(2 * (phase - np.floor(0.5 + phase))) - 1
+        else:
+            signal = np.sin(2 * np.pi * frequency * t + modulation)
+        
+        # Apply filter if present
+        if self.filter:
+            signal = self.filter.apply(signal, sample_rate)
+        
+        # Apply envelope
+        envelope = self.envelope.generate(duration, sample_rate)
+        signal = signal * envelope
+        
+        return signal
+
+
+class WavetableSynth:
+    """
+    Wavetable Synthesizer for morphing between different waveforms.
+    
+    Stores multiple waveforms and interpolates between them for
+    evolving, dynamic timbres.
+    """
+    
+    def __init__(
+        self,
+        wavetable: Optional[List[np.ndarray]] = None,
+        envelope: Optional[ADSR] = None,
+        filter: Optional[Filter] = None
+    ):
+        """
+        Initialize a wavetable synthesizer.
+        
+        Args:
+            wavetable: List of waveform arrays (each should be one cycle)
+            envelope: Optional ADSR envelope
+            filter: Optional filter to apply
+        """
+        if wavetable is None:
+            # Default wavetable: sine -> triangle -> saw -> square
+            wavetable = self._create_default_wavetable()
+        
+        self.wavetable = wavetable
+        self.envelope = envelope or ADSR()
+        self.filter = filter
+    
+    def _create_default_wavetable(self, table_size: int = 2048) -> List[np.ndarray]:
+        """Create a default wavetable with basic waveforms."""
+        t = np.linspace(0, 1, table_size, endpoint=False)
+        
+        wavetable = [
+            np.sin(2 * np.pi * t),  # Sine
+            2 * np.abs(2 * (t - np.floor(0.5 + t))) - 1,  # Triangle
+            2 * (t - np.floor(0.5 + t)),  # Saw
+            np.sign(np.sin(2 * np.pi * t))  # Square
+        ]
+        
+        return wavetable
+    
+    def generate_note(
+        self,
+        frequency: float,
+        duration: float,
+        sample_rate: int = 44100,
+        position: float = 0.0,
+        morph_automation: Optional[np.ndarray] = None
+    ) -> np.ndarray:
+        """
+        Generate a single wavetable synthesized note.
+        
+        Args:
+            frequency: Frequency in Hz
+            duration: Duration in seconds
+            sample_rate: Sample rate in Hz
+            position: Position in wavetable (0.0 to 1.0)
+            morph_automation: Optional array for morphing position over time
+            
+        Returns:
+            NumPy array of audio samples
+        """
+        num_samples = int(duration * sample_rate)
+        signal = np.zeros(num_samples)
+        
+        # Calculate phase increment
+        table_size = len(self.wavetable[0])
+        phase_increment = frequency * table_size / sample_rate
+        phase = 0.0
+        
+        for i in range(num_samples):
+            # Determine wavetable position
+            if morph_automation is not None and i < len(morph_automation):
+                pos = morph_automation[i]
+            else:
+                pos = position
+            
+            # Clamp position to valid range
+            pos = np.clip(pos, 0.0, 1.0)
+            
+            # Calculate which wavetables to interpolate between
+            pos_scaled = pos * (len(self.wavetable) - 1)
+            table_idx1 = int(np.floor(pos_scaled))
+            table_idx2 = min(table_idx1 + 1, len(self.wavetable) - 1)
+            blend = pos_scaled - table_idx1
+            
+            # Get samples from both wavetables
+            phase_int = int(phase) % table_size
+            sample1 = self.wavetable[table_idx1][phase_int]
+            sample2 = self.wavetable[table_idx2][phase_int]
+            
+            # Interpolate between wavetables
+            signal[i] = sample1 * (1 - blend) + sample2 * blend
+            
+            # Increment phase
+            phase += phase_increment
+        
+        # Apply filter if present
+        if self.filter:
+            signal = self.filter.apply(signal, sample_rate)
+        
+        # Apply envelope
+        envelope = self.envelope.generate(duration, sample_rate)
+        signal = signal * envelope
+        
+        return signal
+    
+    @classmethod
+    def from_waveforms(
+        cls,
+        waveforms: List[Literal['sine', 'square', 'saw', 'triangle']],
+        envelope: Optional[ADSR] = None,
+        filter: Optional[Filter] = None,
+        table_size: int = 2048
+    ) -> 'WavetableSynth':
+        """
+        Create a wavetable synth from named waveform types.
+        
+        Args:
+            waveforms: List of waveform names
+            envelope: Optional ADSR envelope
+            filter: Optional filter to apply
+            table_size: Size of each wavetable
+            
+        Returns:
+            WavetableSynth instance
+        """
+        t = np.linspace(0, 1, table_size, endpoint=False)
+        wavetable = []
+        
+        for waveform in waveforms:
+            if waveform == 'sine':
+                wave = np.sin(2 * np.pi * t)
+            elif waveform == 'square':
+                wave = np.sign(np.sin(2 * np.pi * t))
+            elif waveform == 'saw':
+                wave = 2 * (t - np.floor(0.5 + t))
+            elif waveform == 'triangle':
+                wave = 2 * np.abs(2 * (t - np.floor(0.5 + t))) - 1
+            else:
+                wave = np.sin(2 * np.pi * t)
+            
+            wavetable.append(wave)
+        
+        return cls(wavetable=wavetable, envelope=envelope, filter=filter)

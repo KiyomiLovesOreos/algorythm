@@ -333,6 +333,236 @@ class Compression:
         return output
 
 
+class EQ:
+    """
+    Multi-band equalizer effect for frequency shaping.
+    """
+    
+    def __init__(
+        self,
+        low_gain: float = 1.0,
+        mid_gain: float = 1.0,
+        high_gain: float = 1.0,
+        low_freq: float = 200.0,
+        high_freq: float = 2000.0
+    ):
+        """
+        Initialize a 3-band EQ effect.
+        
+        Args:
+            low_gain: Low frequency gain multiplier (0.0 to 2.0)
+            mid_gain: Mid frequency gain multiplier (0.0 to 2.0)
+            high_gain: High frequency gain multiplier (0.0 to 2.0)
+            low_freq: Low/mid crossover frequency in Hz
+            high_freq: Mid/high crossover frequency in Hz
+        """
+        self.low_gain = low_gain
+        self.mid_gain = mid_gain
+        self.high_gain = high_gain
+        self.low_freq = low_freq
+        self.high_freq = high_freq
+    
+    def apply(self, signal: np.ndarray, sample_rate: int = 44100) -> np.ndarray:
+        """
+        Apply EQ effect to audio signal.
+        
+        Args:
+            signal: Input audio signal
+            sample_rate: Sample rate in Hz
+            
+        Returns:
+            Processed audio signal
+        """
+        # Simple 3-band EQ using FFT
+        spectrum = np.fft.rfft(signal)
+        freqs = np.fft.rfftfreq(len(signal), 1/sample_rate)
+        
+        # Apply gain to each band
+        low_mask = freqs < self.low_freq
+        mid_mask = (freqs >= self.low_freq) & (freqs < self.high_freq)
+        high_mask = freqs >= self.high_freq
+        
+        spectrum[low_mask] *= self.low_gain
+        spectrum[mid_mask] *= self.mid_gain
+        spectrum[high_mask] *= self.high_gain
+        
+        # Convert back to time domain
+        return np.fft.irfft(spectrum, n=len(signal))
+
+
+class Phaser:
+    """
+    Phaser effect for creating sweeping notch filter effects.
+    """
+    
+    def __init__(
+        self,
+        rate: float = 0.5,
+        depth: float = 0.5,
+        stages: int = 4,
+        feedback: float = 0.5,
+        mix: float = 0.5
+    ):
+        """
+        Initialize a phaser effect.
+        
+        Args:
+            rate: LFO rate in Hz
+            depth: Modulation depth (0.0 to 1.0)
+            stages: Number of all-pass filter stages (2-12)
+            feedback: Feedback amount (0.0 to 1.0)
+            mix: Wet/dry mix (0.0 = dry, 1.0 = wet)
+        """
+        self.rate = rate
+        self.depth = depth
+        self.stages = max(2, min(12, stages))
+        self.feedback = feedback
+        self.mix = mix
+    
+    def apply(self, signal: np.ndarray, sample_rate: int = 44100) -> np.ndarray:
+        """
+        Apply phaser effect to audio signal.
+        
+        Args:
+            signal: Input audio signal
+            sample_rate: Sample rate in Hz
+            
+        Returns:
+            Processed audio signal
+        """
+        dry = signal.copy()
+        
+        # Create LFO for frequency modulation
+        duration = len(signal) / sample_rate
+        t = np.linspace(0, duration, len(signal))
+        lfo = np.sin(2 * np.pi * self.rate * t)
+        
+        # Simple all-pass filter approximation
+        wet = signal.copy()
+        for stage in range(self.stages):
+            # Vary delay based on LFO
+            max_delay = int(0.005 * sample_rate)  # 5ms max delay
+            delayed = np.zeros_like(wet)
+            for i in range(len(wet)):
+                delay_samples = int((lfo[i] * 0.5 + 0.5) * max_delay * self.depth)
+                if i >= delay_samples:
+                    delayed[i] = wet[i - delay_samples]
+            
+            # All-pass filter approximation
+            wet = wet - delayed
+        
+        # Add feedback
+        wet = wet + wet * self.feedback * 0.3
+        
+        # Mix wet and dry
+        return dry * (1 - self.mix) + wet * self.mix
+
+
+class Tremolo:
+    """
+    Tremolo effect for amplitude modulation.
+    """
+    
+    def __init__(
+        self,
+        rate: float = 5.0,
+        depth: float = 0.5,
+        waveform: Literal['sine', 'square', 'triangle'] = 'sine'
+    ):
+        """
+        Initialize a tremolo effect.
+        
+        Args:
+            rate: Modulation rate in Hz
+            depth: Modulation depth (0.0 to 1.0)
+            waveform: LFO waveform type
+        """
+        self.rate = rate
+        self.depth = depth
+        self.waveform = waveform
+    
+    def apply(self, signal: np.ndarray, sample_rate: int = 44100) -> np.ndarray:
+        """
+        Apply tremolo effect to audio signal.
+        
+        Args:
+            signal: Input audio signal
+            sample_rate: Sample rate in Hz
+            
+        Returns:
+            Processed audio signal
+        """
+        # Create LFO for amplitude modulation
+        duration = len(signal) / sample_rate
+        t = np.linspace(0, duration, len(signal))
+        
+        if self.waveform == 'sine':
+            lfo = np.sin(2 * np.pi * self.rate * t)
+        elif self.waveform == 'square':
+            lfo = np.sign(np.sin(2 * np.pi * self.rate * t))
+        elif self.waveform == 'triangle':
+            lfo = 2 * np.abs(2 * (t * self.rate - np.floor(0.5 + t * self.rate))) - 1
+        else:
+            lfo = np.sin(2 * np.pi * self.rate * t)
+        
+        # Scale LFO to modulation range
+        modulation = 1.0 - self.depth * (1.0 - (lfo * 0.5 + 0.5))
+        
+        return signal * modulation
+
+
+class Bitcrusher:
+    """
+    Bitcrusher effect for digital distortion and lo-fi sounds.
+    """
+    
+    def __init__(
+        self,
+        bit_depth: int = 8,
+        sample_rate_reduction: float = 1.0,
+        mix: float = 1.0
+    ):
+        """
+        Initialize a bitcrusher effect.
+        
+        Args:
+            bit_depth: Bit depth for quantization (1-16)
+            sample_rate_reduction: Sample rate reduction factor (1.0 = no reduction)
+            mix: Wet/dry mix (0.0 = dry, 1.0 = wet)
+        """
+        self.bit_depth = max(1, min(16, bit_depth))
+        self.sample_rate_reduction = max(1.0, sample_rate_reduction)
+        self.mix = mix
+    
+    def apply(self, signal: np.ndarray, sample_rate: int = 44100) -> np.ndarray:
+        """
+        Apply bitcrusher effect to audio signal.
+        
+        Args:
+            signal: Input audio signal
+            sample_rate: Sample rate in Hz
+            
+        Returns:
+            Processed audio signal
+        """
+        dry = signal.copy()
+        wet = signal.copy()
+        
+        # Bit depth reduction (quantization)
+        levels = 2 ** self.bit_depth
+        wet = np.round(wet * levels) / levels
+        
+        # Sample rate reduction (decimation)
+        if self.sample_rate_reduction > 1.0:
+            step = int(self.sample_rate_reduction)
+            for i in range(len(wet)):
+                if i % step != 0:
+                    wet[i] = wet[i - (i % step)]
+        
+        # Mix wet and dry
+        return dry * (1 - self.mix) + wet * self.mix
+
+
 class EffectChain:
     """
     Chain of audio effects to be applied in sequence.
@@ -647,6 +877,7 @@ class Composition:
         self.sample_rate = sample_rate
         self.tracks: Dict[str, Track] = {}
         self.current_track: Optional[Track] = None
+        self.master_volume = 1.0
     
     def add_track(self, name: str, synth: Synth) -> 'Composition':
         """
@@ -730,6 +961,62 @@ class Composition:
         self.current_track.add_fx(effect)
         return self
     
+    def set_track_volume(self, track_name: str, volume: float) -> 'Composition':
+        """
+        Set volume for a specific track.
+        
+        Args:
+            track_name: Name of the track
+            volume: Volume level (0.0 to 1.0, or higher for amplification)
+            
+        Returns:
+            Self for method chaining
+        """
+        if track_name not in self.tracks:
+            raise ValueError(f"Track '{track_name}' not found")
+        
+        self.tracks[track_name].volume = volume
+        return self
+    
+    def set_master_volume(self, volume: float) -> 'Composition':
+        """
+        Set master volume for the entire composition.
+        
+        Args:
+            volume: Volume level (0.0 to 1.0, or higher for amplification)
+            
+        Returns:
+            Self for method chaining
+        """
+        self.master_volume = volume
+        return self
+    
+    def fade_in(self, duration: float) -> 'Composition':
+        """
+        Apply a fade-in to the composition.
+        
+        Args:
+            duration: Fade-in duration in seconds
+            
+        Returns:
+            Self for method chaining
+        """
+        self._fade_in_duration = duration
+        return self
+    
+    def fade_out(self, duration: float) -> 'Composition':
+        """
+        Apply a fade-out to the composition.
+        
+        Args:
+            duration: Fade-out duration in seconds
+            
+        Returns:
+            Self for method chaining
+        """
+        self._fade_out_duration = duration
+        return self
+    
     def render(
         self,
         file_path: Optional[str] = None,
@@ -762,6 +1049,22 @@ class Composition:
             if len(signal) > 0:
                 output[:len(signal)] += signal
         
+        # Apply master volume
+        output = output * self.master_volume
+        
+        # Apply fade in/out if specified
+        if hasattr(self, '_fade_in_duration') and self._fade_in_duration > 0:
+            fade_in_samples = int(self._fade_in_duration * self.sample_rate)
+            fade_in_samples = min(fade_in_samples, len(output))
+            fade_curve = np.linspace(0, 1, fade_in_samples)
+            output[:fade_in_samples] *= fade_curve
+        
+        if hasattr(self, '_fade_out_duration') and self._fade_out_duration > 0:
+            fade_out_samples = int(self._fade_out_duration * self.sample_rate)
+            fade_out_samples = min(fade_out_samples, len(output))
+            fade_curve = np.linspace(1, 0, fade_out_samples)
+            output[-fade_out_samples:] *= fade_curve
+        
         # Normalize to prevent clipping
         max_amplitude = np.max(np.abs(output))
         if max_amplitude > 0:
@@ -782,3 +1085,144 @@ class Composition:
                 exporter.export(output, file_path, self.sample_rate, quality)
         
         return output
+
+
+class VolumeControl:
+    """
+    Utility class for volume control and conversions.
+    
+    Provides methods for converting between different volume representations
+    and applying volume changes to audio signals.
+    """
+    
+    @staticmethod
+    def db_to_linear(db: float) -> float:
+        """
+        Convert decibels to linear amplitude.
+        
+        Args:
+            db: Volume in decibels
+            
+        Returns:
+            Linear amplitude multiplier
+        """
+        return 10.0 ** (db / 20.0)
+    
+    @staticmethod
+    def linear_to_db(linear: float) -> float:
+        """
+        Convert linear amplitude to decibels.
+        
+        Args:
+            linear: Linear amplitude multiplier
+            
+        Returns:
+            Volume in decibels
+        """
+        if linear <= 0:
+            return -np.inf
+        return 20.0 * np.log10(linear)
+    
+    @staticmethod
+    def apply_volume(signal: np.ndarray, volume: float) -> np.ndarray:
+        """
+        Apply volume to audio signal.
+        
+        Args:
+            signal: Input audio signal
+            volume: Volume multiplier (0.0 to 1.0, or higher for amplification)
+            
+        Returns:
+            Audio signal with volume applied
+        """
+        return signal * volume
+    
+    @staticmethod
+    def apply_db_volume(signal: np.ndarray, db: float) -> np.ndarray:
+        """
+        Apply volume in decibels to audio signal.
+        
+        Args:
+            signal: Input audio signal
+            db: Volume in decibels (negative for attenuation, positive for amplification)
+            
+        Returns:
+            Audio signal with volume applied
+        """
+        return signal * VolumeControl.db_to_linear(db)
+    
+    @staticmethod
+    def normalize(signal: np.ndarray, target_db: float = -3.0) -> np.ndarray:
+        """
+        Normalize audio signal to target dB level.
+        
+        Args:
+            signal: Input audio signal
+            target_db: Target peak level in dB
+            
+        Returns:
+            Normalized audio signal
+        """
+        max_amplitude = np.max(np.abs(signal))
+        if max_amplitude > 0:
+            target_linear = VolumeControl.db_to_linear(target_db)
+            return signal / max_amplitude * target_linear
+        return signal
+    
+    @staticmethod
+    def fade(
+        signal: np.ndarray,
+        fade_in: float = 0.0,
+        fade_out: float = 0.0,
+        sample_rate: int = 44100,
+        curve: str = 'linear'
+    ) -> np.ndarray:
+        """
+        Apply fade in/out to audio signal.
+        
+        Args:
+            signal: Input audio signal
+            fade_in: Fade in duration in seconds
+            fade_out: Fade out duration in seconds
+            sample_rate: Sample rate in Hz
+            curve: Fade curve type ('linear', 'exponential', 'logarithmic')
+            
+        Returns:
+            Audio signal with fades applied
+        """
+        output = signal.copy()
+        
+        # Apply fade in
+        if fade_in > 0:
+            fade_in_samples = int(fade_in * sample_rate)
+            fade_in_samples = min(fade_in_samples, len(output))
+            
+            if curve == 'linear':
+                fade_curve = np.linspace(0, 1, fade_in_samples)
+            elif curve == 'exponential':
+                fade_curve = np.exp(np.linspace(-5, 0, fade_in_samples))
+            elif curve == 'logarithmic':
+                fade_curve = np.log10(np.linspace(1, 10, fade_in_samples)) / np.log10(10)
+            else:
+                fade_curve = np.linspace(0, 1, fade_in_samples)
+            
+            output[:fade_in_samples] *= fade_curve
+        
+        # Apply fade out
+        if fade_out > 0:
+            fade_out_samples = int(fade_out * sample_rate)
+            fade_out_samples = min(fade_out_samples, len(output))
+            
+            if curve == 'linear':
+                fade_curve = np.linspace(1, 0, fade_out_samples)
+            elif curve == 'exponential':
+                fade_curve = np.exp(np.linspace(0, -5, fade_out_samples))
+            elif curve == 'logarithmic':
+                fade_curve = np.log10(np.linspace(10, 1, fade_out_samples)) / np.log10(10)
+            else:
+                fade_curve = np.linspace(1, 0, fade_out_samples)
+            
+            output[-fade_out_samples:] *= fade_curve
+        
+        return output
+

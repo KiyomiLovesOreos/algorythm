@@ -9,7 +9,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="algorythm",
-    version="0.1.0",
+    version="0.3.0",
     author="KiyomiLovesOreos",
     description="A Python Library for Algorithmic Music - Manim-inspired declarative audio synthesis",
     long_description=long_description,
@@ -17,7 +17,7 @@ setup(
     url="https://github.com/KiyomiLovesOreos/algorythm",
     packages=find_packages(),
     classifiers=[
-        "Development Status :: 3 - Alpha",
+        "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",
         "Intended Audience :: Science/Research",
         "Topic :: Multimedia :: Sound/Audio :: Sound Synthesis",
@@ -29,6 +29,7 @@ setup(
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
     ],
     python_requires=">=3.7",
     install_requires=[
@@ -45,10 +46,22 @@ setup(
             "soundfile>=0.10.0",  # For FLAC export
             "pydub>=0.25.0",      # For MP3/OGG export
         ],
+        "playback": [
+            "pyaudio>=0.2.11",    # For real-time audio playback
+        ],
+        "gui": [
+            "pyaudio>=0.2.11",    # For audio playback in GUI
+        ],
+        "all": [
+            "soundfile>=0.10.0",
+            "pydub>=0.25.0",
+            "pyaudio>=0.2.11",
+        ],
     },
     entry_points={
         "console_scripts": [
             "algorythm=algorythm.cli:main",
+            "algorythm-live=algorythm.live_gui:launch",
         ],
     },
 )

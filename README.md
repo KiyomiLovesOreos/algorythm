@@ -28,7 +28,7 @@ pip install -e ".[export]"
 |--------|---------|---------------------|
 | `algorythm.synth` | Defines sound sources and timbres | `Oscillator`, `Filter`, `ADSR`, `SynthPresets`, `Synth` |
 | `algorythm.sequence` | Handles rhythmic and melodic patterns | `Motif`, `Rhythm`, `Arpeggiator`, `Scale`, `Chord` |
-| `algorythm.structure` | Arranges and composes the final track | `Track`, `Composition`, `EffectChain`, `Reverb`, `Delay`, `Chorus`, `Flanger`, `Distortion`, `Compression` |
+| `algorythm.structure` | Arranges and composes the final track | `Track`, `Composition`, `EffectChain`, `Reverb`, `Delay`, `Chorus`, `Flanger`, `Distortion`, `Compression`, `VolumeControl` |
 | `algorythm.export` | Renders and saves the final audio | `RenderEngine`, `Exporter` |
 | `algorythm.generative` | Generative composition tools | `LSystem`, `CellularAutomata` |
 | `algorythm.automation` | Parameter automation and data sonification | `Automation`, `AutomationTrack`, `DataSonification` |
@@ -194,6 +194,28 @@ comp = Composition(tempo=120)
 comp.add_track('Lead', synth).repeat_motif(melody, bars=4)
 ```
 
+**Volume Control**: Master and track-level volume control with fade support
+```python
+from algorythm.structure import Composition, VolumeControl
+
+# Set individual track volumes
+comp.set_track_volume('Bass', 0.8)
+comp.set_track_volume('Lead', 1.0)
+
+# Set master volume
+comp.set_master_volume(0.9)
+
+# Add fade in/out
+comp.fade_in(1.0).fade_out(2.0)
+
+# Use VolumeControl utilities
+volume_linear = VolumeControl.db_to_linear(-6.0)  # Convert -6 dB to linear
+volume_db = VolumeControl.linear_to_db(0.5)  # Convert 0.5 linear to dB
+audio_with_volume = VolumeControl.apply_db_volume(signal, -3.0)  # Apply -3 dB
+normalized = VolumeControl.normalize(signal, target_db=-3.0)  # Normalize to -3 dB
+faded = VolumeControl.fade(signal, fade_in=1.0, fade_out=2.0, curve='exponential')
+```
+
 **Effects**: Audio effects (Reverb, Delay, Chorus, Flanger, Distortion, Compression)
 ```python
 from algorythm.structure import Reverb, Delay, Flanger, Distortion, Compression
@@ -217,8 +239,21 @@ stereo_output = spatial.apply(mono_signal)  # Returns stereo with panning and di
 **Exporter**: Exports audio to various formats (WAV, FLAC, MP3, OGG)
 ```python
 from algorythm.export import Exporter
+
+# By default, files are exported to ~/Music directory
 exporter = Exporter()
 exporter.export(audio_signal, 'output.wav', sample_rate=44100, quality='high')
+
+# Use subdirectories within ~/Music
+exporter.export(audio_signal, 'myproject/track01.wav', sample_rate=44100)
+
+# Use absolute paths to save elsewhere
+exporter.export(audio_signal, '/tmp/test.wav', sample_rate=44100)
+
+# Specify custom default directory
+custom_exporter = Exporter(default_directory='/path/to/project')
+custom_exporter.export(audio_signal, 'track.wav', sample_rate=44100)
+
 # For MP3, OGG, FLAC: install with pip install -e ".[export]"
 exporter.export(audio_signal, 'output.flac', sample_rate=44100, quality='high')
 exporter.export(audio_signal, 'output.mp3', sample_rate=44100, quality='high')
