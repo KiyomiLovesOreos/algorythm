@@ -247,6 +247,78 @@ class SynthPresets:
             filter=Filter.lowpass(cutoff=800, resonance=0.7),
             envelope=ADSR(attack=0.05, decay=0.3, sustain=0.6, release=0.2)
         )
+    
+    @staticmethod
+    def lead() -> 'Synth':
+        """Create a lead synth preset."""
+        return Synth(
+            waveform='saw',
+            filter=Filter.lowpass(cutoff=4000, resonance=0.8),
+            envelope=ADSR(attack=0.01, decay=0.1, sustain=0.9, release=0.3)
+        )
+    
+    @staticmethod
+    def organ() -> 'AdditiveeSynth':
+        """Create an organ preset."""
+        return AdditiveeSynth(
+            num_harmonics=8,
+            harmonic_amplitudes=[1.0, 0.5, 0.3, 0.2, 0.15, 0.1, 0.08, 0.05],
+            envelope=ADSR(attack=0.01, decay=0.1, sustain=1.0, release=0.1)
+        )
+    
+    @staticmethod
+    def bell() -> 'FMSynth':
+        """Create a bell preset."""
+        return FMSynth(
+            carrier_waveform='sine',
+            modulator_waveform='sine',
+            modulation_index=3.5,
+            mod_freq_ratio=3.5,
+            envelope=ADSR(attack=0.001, decay=1.0, sustain=0.3, release=2.0)
+        )
+    
+    @staticmethod
+    def strings() -> 'PadSynth':
+        """Create a strings preset."""
+        return PadSynth(
+            num_voices=9,
+            detune_amount=0.08,
+            waveform='saw',
+            envelope=ADSR(attack=1.0, decay=0.5, sustain=0.9, release=2.0),
+            filter=Filter.lowpass(cutoff=3000, resonance=0.4)
+        )
+    
+    @staticmethod
+    def guitar() -> 'PhysicalModelSynth':
+        """Create a guitar preset."""
+        return PhysicalModelSynth(
+            model_type='string',
+            damping=0.996,
+            brightness=0.7,
+            envelope=ADSR(attack=0.001, decay=0.5, sustain=0.5, release=0.5)
+        )
+    
+    @staticmethod
+    def drum() -> 'PhysicalModelSynth':
+        """Create a drum preset."""
+        return PhysicalModelSynth(
+            model_type='drum',
+            damping=0.98,
+            brightness=0.6,
+            envelope=ADSR(attack=0.001, decay=0.2, sustain=0.1, release=0.3)
+        )
+    
+    @staticmethod
+    def brass() -> 'FMSynth':
+        """Create a brass preset."""
+        return FMSynth(
+            carrier_waveform='saw',
+            modulator_waveform='sine',
+            modulation_index=1.5,
+            mod_freq_ratio=1.0,
+            envelope=ADSR(attack=0.1, decay=0.2, sustain=0.8, release=0.3),
+            filter=Filter.lowpass(cutoff=3500, resonance=0.5)
+        )
 
 
 class Synth:
@@ -553,3 +625,371 @@ class WavetableSynth:
             wavetable.append(wave)
         
         return cls(wavetable=wavetable, envelope=envelope, filter=filter)
+
+
+class PhysicalModelSynth:
+    """
+    Physical modeling synthesizer for realistic instrument sounds.
+    
+    Simulates the physics of real instruments like strings, drums, and wind instruments.
+    """
+    
+    def __init__(
+        self,
+        model_type: Literal['string', 'drum', 'wind'] = 'string',
+        damping: float = 0.995,
+        brightness: float = 0.5,
+        envelope: Optional[ADSR] = None
+    ):
+        self.model_type = model_type
+        self.damping = damping
+        self.brightness = brightness
+        self.envelope = envelope or ADSR(attack=0.001, decay=0.1, sustain=0.7, release=0.3)
+    
+    def generate_note(
+        self,
+        frequency: float,
+        duration: float,
+        sample_rate: int = 44100
+    ) -> np.ndarray:
+        num_samples = int(duration * sample_rate)
+        
+        if self.model_type == 'string':
+            signal = self._karplus_strong(frequency, num_samples, sample_rate)
+        elif self.model_type == 'drum':
+            signal = self._drum_model(frequency, num_samples, sample_rate)
+        elif self.model_type == 'wind':
+            signal = self._wind_model(frequency, num_samples, sample_rate)
+        else:
+            signal = np.zeros(num_samples)
+        
+        envelope = self.envelope.generate(duration, sample_rate)
+        return signal * envelope
+    
+    def _karplus_strong(self, frequency: float, num_samples: int, sample_rate: int) -> np.ndarray:
+        delay_length = int(sample_rate / frequency)
+        buffer = np.random.uniform(-1, 1, delay_length)
+        output = np.zeros(num_samples)
+        
+        for i in range(num_samples):
+            output[i] = buffer[0]
+            avg = (buffer[0] + buffer[1]) / 2 * self.damping
+            buffer = np.append(buffer[1:], avg)
+        
+        return output
+    
+    def _drum_model(self, frequency: float, num_samples: int, sample_rate: int) -> np.ndarray:
+        t = np.linspace(0, num_samples / sample_rate, num_samples, endpoint=False)
+        signal = np.random.uniform(-1, 1, num_samples) * np.exp(-t * 10)
+        
+        resonance = np.sin(2 * np.pi * frequency * t) * np.exp(-t * 5)
+        return signal * 0.5 + resonance * 0.5
+    
+    def _wind_model(self, frequency: float, num_samples: int, sample_rate: int) -> np.ndarray:
+        t = np.linspace(0, num_samples / sample_rate, num_samples, endpoint=False)
+        
+        fundamental = np.sin(2 * np.pi * frequency * t)
+        harmonics = sum(np.sin(2 * np.pi * frequency * (i + 1) * t) / (i + 1) 
+                       for i in range(1, 5))
+        
+        noise = np.random.uniform(-1, 1, num_samples) * 0.1 * self.brightness
+        return (fundamental + harmonics * 0.3 + noise) * 0.5
+
+
+class AdditiveeSynth:
+    """
+    Additive synthesizer combining multiple sine wave harmonics.
+    """
+    
+    def __init__(
+        self,
+        num_harmonics: int = 8,
+        harmonic_amplitudes: Optional[List[float]] = None,
+        envelope: Optional[ADSR] = None
+    ):
+        self.num_harmonics = num_harmonics
+        self.harmonic_amplitudes = harmonic_amplitudes or [1.0 / (i + 1) for i in range(num_harmonics)]
+        self.envelope = envelope or ADSR()
+    
+    def generate_note(
+        self,
+        frequency: float,
+        duration: float,
+        sample_rate: int = 44100
+    ) -> np.ndarray:
+        num_samples = int(duration * sample_rate)
+        t = np.linspace(0, duration, num_samples, endpoint=False)
+        signal = np.zeros(num_samples)
+        
+        for i, amp in enumerate(self.harmonic_amplitudes[:self.num_harmonics]):
+            harmonic_freq = frequency * (i + 1)
+            signal += amp * np.sin(2 * np.pi * harmonic_freq * t)
+        
+        signal = signal / np.max(np.abs(signal))
+        envelope = self.envelope.generate(duration, sample_rate)
+        return signal * envelope
+
+
+class PadSynth:
+    """
+    Creates lush pad sounds with thick, detuned oscillators.
+    """
+    
+    def __init__(
+        self,
+        num_voices: int = 7,
+        detune_amount: float = 0.1,
+        waveform: Literal['sine', 'saw', 'square', 'triangle'] = 'saw',
+        envelope: Optional[ADSR] = None,
+        filter: Optional[Filter] = None
+    ):
+        self.num_voices = num_voices
+        self.detune_amount = detune_amount
+        self.waveform = waveform
+        self.envelope = envelope or ADSR(attack=2.0, decay=1.0, sustain=0.8, release=3.0)
+        self.filter = filter or Filter.lowpass(cutoff=2000, resonance=0.5)
+    
+    def generate_note(
+        self,
+        frequency: float,
+        duration: float,
+        sample_rate: int = 44100
+    ) -> np.ndarray:
+        num_samples = int(duration * sample_rate)
+        signal = np.zeros(num_samples)
+        
+        for i in range(self.num_voices):
+            detune = (i - self.num_voices // 2) * self.detune_amount
+            voice_freq = frequency * (1 + detune / 100)
+            
+            osc = Oscillator(waveform=self.waveform, frequency=voice_freq)
+            voice = osc.generate(duration, sample_rate)
+            signal += voice
+        
+        signal = signal / self.num_voices
+        
+        if self.filter:
+            signal = self.filter.apply(signal, sample_rate)
+        
+        envelope = self.envelope.generate(duration, sample_rate)
+        return signal * envelope
+
+
+class Effect:
+    """Base class for audio effects."""
+    
+    def apply(self, signal: np.ndarray, sample_rate: int = 44100) -> np.ndarray:
+        return signal
+
+
+class Reverb(Effect):
+    """
+    Reverb effect for adding space and depth.
+    """
+    
+    def __init__(
+        self,
+        room_size: float = 0.5,
+        damping: float = 0.5,
+        wet_level: float = 0.3
+    ):
+        self.room_size = room_size
+        self.damping = damping
+        self.wet_level = wet_level
+    
+    def apply(self, signal: np.ndarray, sample_rate: int = 44100) -> np.ndarray:
+        delay_times = [int(sample_rate * 0.037 * self.room_size),
+                      int(sample_rate * 0.041 * self.room_size),
+                      int(sample_rate * 0.043 * self.room_size),
+                      int(sample_rate * 0.047 * self.room_size)]
+        
+        wet = np.zeros_like(signal)
+        for delay_time in delay_times:
+            delayed = np.concatenate([np.zeros(delay_time), signal[:-delay_time]])
+            wet += delayed * self.damping
+        
+        wet = wet / len(delay_times)
+        return signal * (1 - self.wet_level) + wet * self.wet_level
+
+
+class Delay(Effect):
+    """
+    Delay effect for echoes and rhythmic patterns.
+    """
+    
+    def __init__(
+        self,
+        delay_time: float = 0.5,
+        feedback: float = 0.5,
+        wet_level: float = 0.5
+    ):
+        self.delay_time = delay_time
+        self.feedback = feedback
+        self.wet_level = wet_level
+    
+    def apply(self, signal: np.ndarray, sample_rate: int = 44100) -> np.ndarray:
+        delay_samples = int(self.delay_time * sample_rate)
+        output = signal.copy()
+        
+        for i in range(delay_samples, len(signal)):
+            output[i] += output[i - delay_samples] * self.feedback
+        
+        return signal * (1 - self.wet_level) + output * self.wet_level
+
+
+class Chorus(Effect):
+    """
+    Chorus effect for thickening sounds.
+    """
+    
+    def __init__(
+        self,
+        depth: float = 0.003,
+        rate: float = 1.5,
+        mix: float = 0.5
+    ):
+        self.depth = depth
+        self.rate = rate
+        self.mix = mix
+    
+    def apply(self, signal: np.ndarray, sample_rate: int = 44100) -> np.ndarray:
+        num_samples = len(signal)
+        t = np.arange(num_samples) / sample_rate
+        
+        lfo = np.sin(2 * np.pi * self.rate * t)
+        delay_samples = (self.depth * sample_rate * (1 + lfo)).astype(int)
+        
+        wet = np.zeros_like(signal)
+        for i in range(num_samples):
+            delay = min(delay_samples[i], i)
+            if delay > 0:
+                wet[i] = signal[i - delay]
+        
+        return signal * (1 - self.mix) + wet * self.mix
+
+
+class Distortion(Effect):
+    """
+    Distortion effect for adding harmonics and grit.
+    """
+    
+    def __init__(
+        self,
+        drive: float = 5.0,
+        tone: float = 0.5,
+        mix: float = 1.0
+    ):
+        self.drive = drive
+        self.tone = tone
+        self.mix = mix
+    
+    def apply(self, signal: np.ndarray, sample_rate: int = 44100) -> np.ndarray:
+        wet = np.tanh(signal * self.drive) / np.tanh(self.drive)
+        
+        if self.tone < 1.0:
+            cutoff = 500 + self.tone * 4500
+            filter_obj = Filter.lowpass(cutoff=cutoff)
+            wet = filter_obj.apply(wet, sample_rate)
+        
+        return signal * (1 - self.mix) + wet * self.mix
+
+
+class Compressor(Effect):
+    """
+    Dynamics compressor for controlling signal levels.
+    """
+    
+    def __init__(
+        self,
+        threshold: float = -20.0,
+        ratio: float = 4.0,
+        attack: float = 0.005,
+        release: float = 0.1
+    ):
+        self.threshold = threshold
+        self.ratio = ratio
+        self.attack = attack
+        self.release = release
+    
+    def apply(self, signal: np.ndarray, sample_rate: int = 44100) -> np.ndarray:
+        threshold_linear = 10 ** (self.threshold / 20)
+        output = signal.copy()
+        envelope = 0.0
+        
+        attack_coef = np.exp(-1 / (self.attack * sample_rate))
+        release_coef = np.exp(-1 / (self.release * sample_rate))
+        
+        for i in range(len(signal)):
+            input_level = abs(signal[i])
+            
+            if input_level > envelope:
+                envelope = attack_coef * envelope + (1 - attack_coef) * input_level
+            else:
+                envelope = release_coef * envelope + (1 - release_coef) * input_level
+            
+            if envelope > threshold_linear:
+                gain_reduction = (envelope / threshold_linear) ** (1 / self.ratio - 1)
+                output[i] *= gain_reduction
+        
+        return output
+
+
+class Phaser(Effect):
+    """
+    Phaser effect for sweeping comb-filter sounds.
+    """
+    
+    def __init__(
+        self,
+        rate: float = 0.5,
+        depth: float = 1.0,
+        feedback: float = 0.5,
+        mix: float = 0.5
+    ):
+        self.rate = rate
+        self.depth = depth
+        self.feedback = feedback
+        self.mix = mix
+    
+    def apply(self, signal: np.ndarray, sample_rate: int = 44100) -> np.ndarray:
+        num_samples = len(signal)
+        t = np.arange(num_samples) / sample_rate
+        
+        lfo = np.sin(2 * np.pi * self.rate * t)
+        delay_samples = (2 + self.depth * lfo).astype(int)
+        
+        wet = np.zeros_like(signal)
+        for i in range(num_samples):
+            delay = min(delay_samples[i], i)
+            if delay > 0:
+                wet[i] = signal[i] - wet[i - delay] * self.feedback
+        
+        return signal * (1 - self.mix) + wet * self.mix
+
+
+class BitCrusher(Effect):
+    """
+    Bit crusher for lo-fi digital distortion.
+    """
+    
+    def __init__(
+        self,
+        bit_depth: int = 8,
+        sample_rate_reduction: float = 1.0,
+        mix: float = 1.0
+    ):
+        self.bit_depth = bit_depth
+        self.sample_rate_reduction = sample_rate_reduction
+        self.mix = mix
+    
+    def apply(self, signal: np.ndarray, sample_rate: int = 44100) -> np.ndarray:
+        levels = 2 ** self.bit_depth
+        wet = np.round(signal * levels / 2) / (levels / 2)
+        
+        if self.sample_rate_reduction < 1.0:
+            reduced_rate = int(len(signal) * self.sample_rate_reduction)
+            indices = np.linspace(0, len(signal) - 1, reduced_rate).astype(int)
+            reduced = wet[indices]
+            wet = np.repeat(reduced, len(signal) // reduced_rate + 1)[:len(signal)]
+        
+        return signal * (1 - self.mix) + wet * self.mix

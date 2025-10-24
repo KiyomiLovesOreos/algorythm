@@ -16,11 +16,19 @@
 ## 🎹 All the Instruments You Can Use
 
 ```python
+# Basic Sounds
 SynthPresets.pluck()      # 🎸 Like a guitar
 SynthPresets.bell()       # 🔔 Like a bell
 SynthPresets.warm_pad()   # 🌊 Smooth and warm
 SynthPresets.bass()       # 🔊 Deep and low
 SynthPresets.lead()       # 🎺 Bright and loud
+
+# Advanced Sounds (NEW!)
+SynthPresets.organ()      # 🎹 Church organ
+SynthPresets.strings()    # 🎻 String section
+SynthPresets.guitar()     # 🎸 Acoustic guitar
+SynthPresets.drum()       # 🥁 Drum sound
+SynthPresets.brass()      # 🎺 Trumpet/trombone
 ```
 
 ---
@@ -88,6 +96,37 @@ song.add_fx(Delay(delay_time=0.5, mix=0.3))
 repeat_motif(my_melody, bars=2)   # Short
 repeat_motif(my_melody, bars=4)   # Medium
 repeat_motif(my_melody, bars=8)   # Long
+```
+
+---
+
+## 🎨 Cool Effects to Add!
+
+Make your music sound even cooler by adding effects:
+
+```python
+from algorythm.effects import *
+
+# Space Effects (makes it sound big!)
+Reverb(room_size=0.7, wet_level=0.3)    # 🏰 Like in a big hall
+Delay(delay_time=0.5, feedback=0.5)      # 📢 Echo effect
+
+# Wobbly Effects (makes it swirl!)
+Chorus(mix=0.5)                          # 🌀 Makes it thick and swirly
+Flanger(mix=0.5)                         # 🎭 Jet plane sound
+Phaser(mix=0.5)                          # ✨ Spacey swoosh
+Tremolo(rate=5.0, depth=0.5)            # 📻 Volume wobble
+
+# Crunchy Effects (makes it rough!)
+Distortion(drive=5.0)                    # 🎸 Rock guitar sound
+Overdrive(drive=2.0)                     # 🔥 Warm crunch
+Fuzz(gain=10.0)                          # 💥 Super fuzzy
+BitCrusher(bit_depth=8)                  # 🎮 Video game sound
+
+# How to use effects:
+track = Track("My Track")
+track.add_effect(Reverb(room_size=0.7))
+track.add_effect(Delay(delay_time=0.5))
 ```
 
 ---

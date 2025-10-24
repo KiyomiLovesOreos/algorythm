@@ -6,12 +6,24 @@ A declarative, Manim-inspired library for generating algorithmic music.
 
 __version__ = '0.4.0'
 
-from algorythm.synth import Synth, Oscillator, Filter, ADSR, SynthPresets, FMSynth, WavetableSynth
+from algorythm.synth import (
+    Synth, Oscillator, Filter, ADSR, SynthPresets, 
+    FMSynth, WavetableSynth, PhysicalModelSynth, 
+    AdditiveeSynth, PadSynth
+)
 from algorythm.sequence import Motif, Rhythm, Arpeggiator, Scale, Chord, Tuning
 from algorythm.structure import (
     Track, Composition, EffectChain, 
     Reverb, Delay, Chorus, Flanger, Distortion, Compression, 
     EQ, Phaser, Tremolo, Bitcrusher, SpatialAudio, VolumeControl
+)
+from algorythm.effects import (
+    Effect, Reverb as ReverbFX, Delay as DelayFX, 
+    Chorus as ChorusFX, Flanger as FlangerFX, Phaser as PhaserFX,
+    Distortion as DistortionFX, Overdrive, Fuzz,
+    Compressor, Limiter, Gate,
+    Tremolo as TremoloFX, Vibrato, BitCrusher as BitCrusherFX,
+    AutoPan, RingModulator, EffectChain as FXChain
 )
 from algorythm.export import RenderEngine, Exporter
 from algorythm.audio_loader import load_audio, visualize_audio_file, AudioFile
@@ -42,6 +54,9 @@ __all__ = [
     'SynthPresets',
     'FMSynth',
     'WavetableSynth',
+    'PhysicalModelSynth',
+    'AdditiveeSynth',
+    'PadSynth',
     # Sequence
     'Motif',
     'Rhythm',
@@ -65,6 +80,25 @@ __all__ = [
     'Bitcrusher',
     'SpatialAudio',
     'VolumeControl',
+    # Effects (new module)
+    'Effect',
+    'ReverbFX',
+    'DelayFX',
+    'ChorusFX',
+    'FlangerFX',
+    'PhaserFX',
+    'DistortionFX',
+    'Overdrive',
+    'Fuzz',
+    'Compressor',
+    'Limiter',
+    'Gate',
+    'TremoloFX',
+    'Vibrato',
+    'BitCrusherFX',
+    'AutoPan',
+    'RingModulator',
+    'FXChain',
     # Export
     'RenderEngine',
     'Exporter',
