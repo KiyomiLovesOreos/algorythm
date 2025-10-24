@@ -17,9 +17,12 @@ The library is **declarative** and uses **Object-Oriented Composition**. Users d
 pip install -e .
 ```
 
-For additional export format support (FLAC, MP3, OGG):
+For additional export format support (FLAC, MP3, OGG, MP4 with visualization):
 ```bash
 pip install -e ".[export]"
+# For MP4/video export, also install:
+pip install opencv-python
+# And ensure ffmpeg is installed on your system
 ```
 
 ## Library Structure
@@ -76,13 +79,44 @@ final_track = Composition(tempo=120) \
 The render function handles the heavy lifting, generating audio samples:
 
 ```python
-# Render the final output
+# Render as audio
 final_track.render(
     file_path='epic_track.wav',
     quality='high',
     formats=['wav']  # Supports ['flac', 'mp3', 'ogg'] with additional dependencies
 )
+
+# 🎬 NEW: Export as MP4 with visualization using Exporter directly!
+from algorythm.export import Exporter
+from algorythm.visualization import WaveformVisualizer, SpectrogramVisualizer
+
+# Generate your audio signal
+audio_signal = final_track.render(return_signal=True)
+
+# Create a visualizer
+visualizer = SpectrogramVisualizer(sample_rate=44100)
+
+# Export as MP4
+exporter = Exporter()
+exporter.export(
+    audio_signal,
+    'epic_track.mp4',
+    sample_rate=44100,
+    visualizer=visualizer,
+    video_width=1920,
+    video_height=1080,
+    video_fps=30
+)
 ```
+
+**Video Export Features:**
+- 6 built-in visualizers: waveform, spectrogram, frequency scope, circular, oscilloscope, particle
+- Direct MP4 export via `Exporter.export()` with `.mp4` extension
+- Full HD support (1080p, 4K, custom resolutions)
+- Customizable video dimensions and frame rates
+- Synchronized audio and video
+- See `MP4_EXPORT_GUIDE.md` for complete MP4 export documentation
+- See `VIDEO_EXPORT_GUIDE.md` for advanced video rendering
 
 ## Examples
 
@@ -91,11 +125,14 @@ The `examples/` directory contains several demonstration scripts:
 - `basic_synthesis.py` - Simple synth sound generation
 - `composition_example.py` - Full composition workflow (as shown in the problem statement)
 - `advanced_example.py` - Multiple tracks, effects, and transformations
+- `mp4_export_example.py` - **NEW!** MP4 video export with various visualizers
 
 Run an example:
 ```bash
 cd examples
 python composition_example.py
+# Or try the new MP4 export examples:
+python mp4_export_example.py
 ```
 
 ## API Reference

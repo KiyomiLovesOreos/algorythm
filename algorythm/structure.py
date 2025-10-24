@@ -1021,15 +1021,26 @@ class Composition:
         self,
         file_path: Optional[str] = None,
         quality: str = 'high',
-        formats: Optional[List[str]] = None
+        formats: Optional[List[str]] = None,
+        video: bool = False,
+        video_config: Optional[Dict[str, Any]] = None
     ) -> np.ndarray:
         """
-        Render the composition to audio.
+        Render the composition to audio and optionally video.
         
         Args:
             file_path: Output file path (without extension if multiple formats)
             quality: Quality setting ('low', 'medium', 'high')
             formats: List of output formats (e.g., ['wav', 'mp3', 'flac'])
+            video: If True, export as MP4 video with visualization
+            video_config: Video configuration dictionary with keys:
+                - visualizer: Visualizer type ('waveform', 'spectrum', 'circular', 'particle', 'spectrogram')
+                - width: Video width (default: 1920)
+                - height: Video height (default: 1080)
+                - fps: Frames per second (default: 30)
+                - background_color: RGB tuple (default: (0, 0, 0))
+                - foreground_color: RGB tuple (default: (255, 255, 255))
+                - Additional visualizer-specific options
             
         Returns:
             Rendered audio signal
@@ -1072,19 +1083,97 @@ class Composition:
         
         # Export if file path provided
         if file_path:
-            from algorythm.export import Exporter
-            exporter = Exporter()
-            
-            if formats:
-                for fmt in formats:
-                    # Remove extension from file_path if present
-                    base_path = file_path.rsplit('.', 1)[0] if '.' in file_path else file_path
-                    output_path = f"{base_path}.{fmt}"
-                    exporter.export(output, output_path, self.sample_rate, quality)
+            if video:
+                # Export as video
+                self._export_video(output, file_path, video_config or {})
             else:
-                exporter.export(output, file_path, self.sample_rate, quality)
+                # Export as audio
+                from algorythm.export import Exporter
+                exporter = Exporter()
+                
+                if formats:
+                    for fmt in formats:
+                        # Remove extension from file_path if present
+                        base_path = file_path.rsplit('.', 1)[0] if '.' in file_path else file_path
+                        output_path = f"{base_path}.{fmt}"
+                        exporter.export(output, output_path, self.sample_rate, quality)
+                else:
+                    exporter.export(output, file_path, self.sample_rate, quality)
         
         return output
+    
+    def _export_video(self, audio: np.ndarray, file_path: str, config: Dict[str, Any]) -> None:
+        """
+        Export composition as video with visualization.
+        
+        Args:
+            audio: Rendered audio signal
+            file_path: Output video file path
+            config: Video configuration dictionary
+        """
+        from algorythm.visualization import (
+            VideoRenderer, WaveformVisualizer, FrequencyScopeVisualizer,
+            SpectrogramVisualizer, CircularVisualizer, ParticleVisualizer
+        )
+        
+        # Extract configuration
+        visualizer_type = config.get('visualizer', 'spectrum')
+        width = config.get('width', 1920)
+        height = config.get('height', 1080)
+        fps = config.get('fps', 30)
+        bg_color = config.get('background_color', (0, 0, 0))
+        fg_color = config.get('foreground_color', (255, 255, 255))
+        
+        # Create visualizer based on type
+        if visualizer_type == 'waveform':
+            visualizer = WaveformVisualizer(
+                sample_rate=self.sample_rate,
+                window_size=config.get('window_size', 1024)
+            )
+        elif visualizer_type == 'spectrum':
+            visualizer = FrequencyScopeVisualizer(
+                sample_rate=self.sample_rate,
+                fft_size=config.get('fft_size', 2048),
+                freq_range=config.get('freq_range', (20.0, 20000.0))
+            )
+        elif visualizer_type == 'spectrogram':
+            visualizer = SpectrogramVisualizer(
+                sample_rate=self.sample_rate,
+                window_size=config.get('window_size', 2048),
+                hop_size=config.get('hop_size', 512)
+            )
+        elif visualizer_type == 'circular':
+            visualizer = CircularVisualizer(
+                sample_rate=self.sample_rate,
+                num_bars=config.get('num_bars', 64),
+                inner_radius=config.get('inner_radius', 0.2),
+                bar_width=config.get('bar_width', 0.8),
+                smoothing=config.get('smoothing', 0.5)
+            )
+        elif visualizer_type == 'particle':
+            visualizer = ParticleVisualizer(
+                sample_rate=self.sample_rate,
+                num_particles=config.get('num_particles', 100),
+                decay=config.get('decay', 0.95),
+                sensitivity=config.get('sensitivity', 1.0)
+            )
+        else:
+            # Default to spectrum
+            visualizer = FrequencyScopeVisualizer(sample_rate=self.sample_rate)
+        
+        # Create video renderer
+        renderer = VideoRenderer(
+            width=width,
+            height=height,
+            fps=fps,
+            sample_rate=self.sample_rate,
+            background_color=bg_color,
+            foreground_color=fg_color
+        )
+        
+        # Render video
+        print(f"Rendering video with {visualizer_type} visualizer...")
+        renderer.render_frames(audio, visualizer, output_path=file_path)
 
 
 class VolumeControl:

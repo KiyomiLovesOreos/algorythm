@@ -7,6 +7,23 @@ including waveforms, spectrograms, and frequency scopes.
 
 from typing import Optional, Literal, Tuple, List, Dict, Any
 import numpy as np
+import warnings
+
+# Optional dependencies
+try:
+    import matplotlib
+    matplotlib.use('Agg')  # Non-interactive backend
+    import matplotlib.pyplot as plt
+    from matplotlib.colors import LinearSegmentedColormap
+    HAS_MATPLOTLIB = True
+except ImportError:
+    HAS_MATPLOTLIB = False
+
+try:
+    import cv2
+    HAS_OPENCV = True
+except ImportError:
+    HAS_OPENCV = False
 
 
 class Visualizer:
@@ -14,14 +31,17 @@ class Visualizer:
     Base class for audio visualization.
     """
     
-    def __init__(self, sample_rate: int = 44100):
+    def __init__(self, sample_rate: int = 44100, debug: bool = False):
         """
         Initialize a visualizer.
         
         Args:
             sample_rate: Audio sample rate in Hz
+            debug: Enable debug output
         """
         self.sample_rate = sample_rate
+        self.debug = debug
+        self._frame_count = 0
     
     def generate(self, signal: np.ndarray) -> np.ndarray:
         """
@@ -34,6 +54,11 @@ class Visualizer:
             Visualization data
         """
         raise NotImplementedError("Subclasses must implement generate()")
+    
+    def _log_debug(self, message: str):
+        """Log debug message if debug mode is enabled."""
+        if self.debug:
+            print(f"[{self.__class__.__name__}] {message}")
 
 
 class WaveformVisualizer(Visualizer):
@@ -47,7 +72,8 @@ class WaveformVisualizer(Visualizer):
         self,
         sample_rate: int = 44100,
         window_size: int = 1024,
-        downsample_factor: int = 1
+        downsample_factor: int = 1,
+        debug: bool = False
     ):
         """
         Initialize a waveform visualizer.
@@ -56,8 +82,9 @@ class WaveformVisualizer(Visualizer):
             sample_rate: Audio sample rate in Hz
             window_size: Size of visualization window
             downsample_factor: Factor to downsample signal for display
+            debug: Enable debug output
         """
-        super().__init__(sample_rate)
+        super().__init__(sample_rate, debug)
         self.window_size = window_size
         self.downsample_factor = downsample_factor
     
@@ -90,15 +117,19 @@ class WaveformVisualizer(Visualizer):
         self,
         signal: np.ndarray,
         height: int = 256,
-        width: int = 1024
+        width: int = 1024,
+        line_thickness: int = 2,
+        center_line: bool = True
     ) -> np.ndarray:
         """
-        Convert waveform to image data.
+        Convert waveform to image data with enhanced rendering.
         
         Args:
             signal: Audio signal
             width: Image width in pixels
             height: Image height in pixels
+            line_thickness: Thickness of waveform line
+            center_line: Draw center reference line
             
         Returns:
             Image data as 2D array (height x width)
@@ -113,13 +144,38 @@ class WaveformVisualizer(Visualizer):
         # Create image data
         image = np.zeros((height, width))
         
-        # Map signal to image coordinates
-        center = height // 2
-        for i, sample in enumerate(signal):
-            y = int(center - sample * center)
-            y = np.clip(y, 0, height - 1)
-            image[y, i] = 1.0
+        # Draw center line if requested
+        if center_line:
+            center = height // 2
+            image[center, :] = 0.3
         
+        # Map signal to image coordinates with anti-aliasing
+        center = height // 2
+        for i in range(len(signal) - 1):
+            y1 = int(center - signal[i] * center * 0.9)
+            y2 = int(center - signal[i + 1] * center * 0.9)
+            y1 = np.clip(y1, 0, height - 1)
+            y2 = np.clip(y2, 0, height - 1)
+            
+            # Draw line between points
+            if abs(y2 - y1) <= 1:
+                # Horizontal or nearly horizontal
+                for t in range(line_thickness):
+                    offset = t - line_thickness // 2
+                    y = np.clip(y1 + offset, 0, height - 1)
+                    image[y, i] = 1.0
+            else:
+                # Vertical line using interpolation
+                steps = abs(y2 - y1)
+                for step in range(steps + 1):
+                    y = int(y1 + (y2 - y1) * step / steps)
+                    y = np.clip(y, 0, height - 1)
+                    for t in range(line_thickness):
+                        offset = t - line_thickness // 2
+                        y_thick = np.clip(y + offset, 0, height - 1)
+                        image[y_thick, i] = 1.0
+        
+        self._log_debug(f"Generated waveform image: {width}x{height}, signal length: {len(signal)}")
         return image
 
 
@@ -135,7 +191,8 @@ class SpectrogramVisualizer(Visualizer):
         sample_rate: int = 44100,
         window_size: int = 2048,
         hop_size: int = 512,
-        window_type: Literal['hann', 'hamming', 'blackman'] = 'hann'
+        window_type: Literal['hann', 'hamming', 'blackman'] = 'hann',
+        debug: bool = False
     ):
         """
         Initialize a spectrogram visualizer.
@@ -145,8 +202,9 @@ class SpectrogramVisualizer(Visualizer):
             window_size: FFT window size
             hop_size: Number of samples between windows
             window_type: Type of window function
+            debug: Enable debug output
         """
-        super().__init__(sample_rate)
+        super().__init__(sample_rate, debug)
         self.window_size = window_size
         self.hop_size = hop_size
         self.window_type = window_type
@@ -175,6 +233,7 @@ class SpectrogramVisualizer(Visualizer):
         num_frames = (len(signal) - self.window_size) // self.hop_size + 1
         
         if num_frames <= 0:
+            self._log_debug("Signal too short for spectrogram")
             return np.array([[]])
         
         # Initialize spectrogram array
@@ -200,6 +259,7 @@ class SpectrogramVisualizer(Visualizer):
             
             spectrogram[:, frame_idx] = magnitude_db
         
+        self._log_debug(f"Generated spectrogram: {spectrogram.shape[0]} freq bins x {spectrogram.shape[1]} time frames")
         return spectrogram
     
     def get_time_axis(self, num_frames: int) -> np.ndarray:
@@ -222,6 +282,102 @@ class SpectrogramVisualizer(Visualizer):
             Frequency values in Hz
         """
         return np.linspace(0, self.sample_rate / 2, self.window_size // 2 + 1)
+    
+    def to_colored_image(
+        self,
+        spectrogram: np.ndarray,
+        colormap: str = 'viridis',
+        vmin: Optional[float] = None,
+        vmax: Optional[float] = None
+    ) -> np.ndarray:
+        """
+        Convert spectrogram to colored image using matplotlib colormap.
+        
+        Args:
+            spectrogram: Spectrogram data
+            colormap: Matplotlib colormap name
+            vmin: Minimum value for color mapping
+            vmax: Maximum value for color mapping
+            
+        Returns:
+            RGB image array (height, width, 3)
+        """
+        if not HAS_MATPLOTLIB:
+            warnings.warn("Matplotlib not available, returning grayscale")
+            # Normalize to 0-1 range
+            spec_norm = (spectrogram - np.min(spectrogram))
+            if np.max(spec_norm) > 0:
+                spec_norm = spec_norm / np.max(spec_norm)
+            return np.stack([spec_norm] * 3, axis=-1)
+        
+        # Normalize spectrogram
+        if vmin is None:
+            vmin = np.percentile(spectrogram, 5)
+        if vmax is None:
+            vmax = np.percentile(spectrogram, 95)
+        
+        spec_norm = np.clip((spectrogram - vmin) / (vmax - vmin + 1e-10), 0, 1)
+        
+        # Apply colormap
+        cmap = plt.get_cmap(colormap)
+        colored = cmap(spec_norm)[:, :, :3]  # Remove alpha channel
+        
+        return colored
+    
+    def to_image_data(
+        self,
+        signal: np.ndarray,
+        height: int = 480,
+        width: int = 640
+    ) -> np.ndarray:
+        """
+        Generate spectrogram visualization as image data.
+        
+        Args:
+            signal: Audio signal chunk
+            height: Image height in pixels
+            width: Image width in pixels
+            
+        Returns:
+            2D array of visualization data (0-1 range)
+        """
+        # Generate spectrogram
+        spectrogram = self.generate(signal)
+        
+        if spectrogram.size == 0 or spectrogram.shape[0] == 0 or spectrogram.shape[1] == 0:
+            self._log_debug(f"Empty spectrogram generated")
+            return np.zeros((height, width))
+        
+        # Resize to target dimensions
+        spec_height, spec_width = spectrogram.shape
+        
+        # Create indices for resizing
+        if spec_height > 0 and spec_width > 0:
+            row_indices = (np.arange(height) * spec_height / height).astype(int)
+            col_indices = (np.arange(width) * spec_width / width).astype(int)
+            
+            # Clip indices to valid range
+            row_indices = np.clip(row_indices, 0, spec_height - 1)
+            col_indices = np.clip(col_indices, 0, spec_width - 1)
+            
+            resized = spectrogram[row_indices][:, col_indices]
+        else:
+            resized = np.zeros((height, width))
+        
+        # Normalize to 0-1 range
+        spec_min = np.min(resized)
+        spec_max = np.max(resized)
+        
+        if spec_max > spec_min:
+            normalized = (resized - spec_min) / (spec_max - spec_min)
+        else:
+            normalized = np.zeros((height, width))
+        
+        # Flip vertically (low frequencies at bottom)
+        normalized = np.flipud(normalized)
+        
+        self._log_debug(f"Generated spectrogram image: {height}x{width}")
+        return normalized
 
 
 class FrequencyScopeVisualizer(Visualizer):
@@ -235,7 +391,8 @@ class FrequencyScopeVisualizer(Visualizer):
         self,
         sample_rate: int = 44100,
         fft_size: int = 2048,
-        freq_range: Tuple[float, float] = (20.0, 20000.0)
+        freq_range: Tuple[float, float] = (20.0, 20000.0),
+        debug: bool = False
     ):
         """
         Initialize a frequency scope visualizer.
@@ -244,8 +401,9 @@ class FrequencyScopeVisualizer(Visualizer):
             sample_rate: Audio sample rate in Hz
             fft_size: FFT size for frequency analysis
             freq_range: Frequency range to display (min_hz, max_hz)
+            debug: Enable debug output
         """
-        super().__init__(sample_rate)
+        super().__init__(sample_rate, debug)
         self.fft_size = fft_size
         self.freq_range = freq_range
     
@@ -304,11 +462,71 @@ class FrequencyScopeVisualizer(Visualizer):
         mask = (freq_bins >= min_freq) & (freq_bins <= max_freq)
         
         return freq_bins[mask], spectrum[mask]
+    
+    def to_image_data(
+        self,
+        signal: np.ndarray,
+        height: int = 480,
+        width: int = 640
+    ) -> np.ndarray:
+        """
+        Generate frequency scope visualization as image data.
+        
+        Args:
+            signal: Audio signal chunk
+            height: Image height in pixels
+            width: Image width in pixels
+            
+        Returns:
+            2D array of visualization data (0-1 range)
+        """
+        # Generate spectrum
+        spectrum = self.generate(signal)
+        
+        # Filter to frequency range
+        freq_bins, filtered_spectrum = self.filter_frequency_range(spectrum)
+        
+        if len(filtered_spectrum) == 0:
+            self._log_debug(f"Empty spectrum after filtering")
+            return np.zeros((height, width))
+        
+        # Normalize to 0-1 range
+        spec_min = np.min(filtered_spectrum)
+        spec_max = np.max(filtered_spectrum)
+        
+        if spec_max > spec_min:
+            normalized = (filtered_spectrum - spec_min) / (spec_max - spec_min)
+        else:
+            normalized = np.zeros_like(filtered_spectrum)
+        
+        # Create image with bars
+        image = np.zeros((height, width))
+        
+        # Resample to width
+        if len(normalized) > width:
+            indices = np.linspace(0, len(normalized) - 1, width).astype(int)
+            bar_heights = normalized[indices]
+        else:
+            # Interpolate to width
+            x_old = np.arange(len(normalized))
+            x_new = np.linspace(0, len(normalized) - 1, width)
+            bar_heights = np.interp(x_new, x_old, normalized)
+        
+        # Draw frequency bars from bottom
+        for i in range(width):
+            bar_height = int(bar_heights[i] * height * 0.9)  # Use 90% of height
+            if bar_height > 0:
+                image[-bar_height:, i] = 1.0
+        
+        self._log_debug(f"Generated frequency scope image: {height}x{width}")
+        return image
 
 
 class VideoRenderer:
     """
     Renders synchronized video with audio visualization.
+    Enhanced with multiple visualizer support and extensive customization.
+    Supports both OpenCV and matplotlib backends.
     """
     
     def __init__(
@@ -316,7 +534,12 @@ class VideoRenderer:
         width: int = 1920,
         height: int = 1080,
         fps: int = 30,
-        sample_rate: int = 44100
+        sample_rate: int = 44100,
+        background_color: Tuple[int, int, int] = (0, 0, 0),
+        foreground_color: Tuple[int, int, int] = (255, 255, 255),
+        colormap: str = 'viridis',
+        debug: bool = False,
+        use_matplotlib: bool = False
     ):
         """
         Initialize a video renderer.
@@ -326,32 +549,53 @@ class VideoRenderer:
             height: Video height in pixels
             fps: Frames per second
             sample_rate: Audio sample rate in Hz
+            background_color: RGB background color (0-255 each)
+            foreground_color: RGB foreground color (0-255 each)
+            colormap: Matplotlib colormap for spectrograms
+            debug: Enable debug output
+            use_matplotlib: Force use of matplotlib backend (slower but no opencv required)
         """
         self.width = width
         self.height = height
         self.fps = fps
         self.sample_rate = sample_rate
         self.samples_per_frame = sample_rate // fps
+        self.background_color = background_color
+        self.foreground_color = foreground_color
+        self.colormap = colormap
+        self.debug = debug
+        self.use_matplotlib = use_matplotlib or not HAS_OPENCV
+        
+        if self.debug:
+            print(f"[VideoRenderer] Initialized: {width}x{height} @ {fps}fps")
+            print(f"[VideoRenderer] Backend: {'matplotlib' if self.use_matplotlib else 'opencv'}")
+            print(f"[VideoRenderer] Samples per frame: {self.samples_per_frame}")
     
     def render_frames(
         self,
         signal: np.ndarray,
         visualizer: Visualizer,
-        output_path: Optional[str] = None
+        output_path: Optional[str] = None,
+        progress_callback: Optional[callable] = None
     ) -> list:
         """
-        Render video frames from audio signal.
+        Render video frames from audio signal with progress tracking.
         
         Args:
             signal: Audio signal
             visualizer: Visualizer to use for frame generation
-            output_path: Optional path to save video (requires external video library)
+            output_path: Optional path to save video
+            progress_callback: Optional callback function(current, total) for progress updates
             
         Returns:
             List of frame data
         """
         # Calculate number of frames
         num_frames = int(len(signal) / self.samples_per_frame)
+        
+        if self.debug:
+            print(f"[VideoRenderer] Rendering {num_frames} frames...")
+            print(f"[VideoRenderer] Signal length: {len(signal)} samples ({len(signal)/self.sample_rate:.2f}s)")
         
         frames = []
         
@@ -375,14 +619,31 @@ class VideoRenderer:
             elif isinstance(visualizer, FrequencyScopeVisualizer):
                 spectrum = visualizer.generate(chunk)
                 frame_data = self._spectrum_to_image(spectrum, self.height, self.width)
+            elif isinstance(visualizer, CircularVisualizer):
+                frame_data = visualizer.to_image_data(chunk, self.height, self.width)
+            elif isinstance(visualizer, OscilloscopeVisualizer):
+                frame_data = visualizer.to_image_data(chunk, self.height, self.width)
+            elif isinstance(visualizer, ParticleVisualizer):
+                frame_data = visualizer.to_image_data(chunk, self.height, self.width)
             else:
                 frame_data = np.zeros((self.height, self.width))
             
             frames.append(frame_data)
+            
+            # Progress callback
+            if progress_callback and frame_idx % 10 == 0:
+                progress_callback(frame_idx, num_frames)
+            
+            # Debug output every 100 frames
+            if self.debug and frame_idx % 100 == 0:
+                print(f"[VideoRenderer] Rendered frame {frame_idx}/{num_frames} ({100*frame_idx/num_frames:.1f}%)")
+        
+        if self.debug:
+            print(f"[VideoRenderer] Completed rendering {len(frames)} frames")
         
         # Save video if output path provided
         if output_path:
-            self._save_video(frames, output_path)
+            self._save_video(frames, signal, output_path)
         
         return frames
     
@@ -431,21 +692,232 @@ class VideoRenderer:
         
         return image
     
-    def _save_video(self, frames: list, output_path: str) -> None:
+    def _save_video(self, frames: list, audio_signal: np.ndarray, output_path: str) -> None:
         """
-        Save frames as video.
+        Save frames as video with audio using opencv or matplotlib backend.
         
-        Note: This is a placeholder. Real implementation would require
-        a video encoding library like opencv-python or moviepy.
+        Args:
+            frames: List of frame data arrays
+            audio_signal: Audio signal to embed in video
+            output_path: Output video file path
         """
-        print(f"Note: Video export to {output_path} requires additional dependencies.")
-        print("Install opencv-python or moviepy for video export support.")
-        # In a real implementation:
-        # import cv2
-        # out = cv2.VideoWriter(output_path, ...)
-        # for frame in frames:
-        #     out.write(frame)
-        # out.release()
+        if self.debug:
+            print(f"[VideoRenderer] Saving video to: {output_path}")
+        
+        try:
+            import tempfile
+            import os
+            from pathlib import Path
+            
+            # Ensure proper file extension
+            if not output_path.lower().endswith('.mp4'):
+                output_path += '.mp4'
+            
+            if self.use_matplotlib and HAS_MATPLOTLIB:
+                self._save_video_matplotlib(frames, audio_signal, output_path)
+            elif HAS_OPENCV:
+                self._save_video_opencv(frames, audio_signal, output_path)
+            else:
+                raise ImportError("No video backend available. Install opencv-python or matplotlib.")
+            
+            if self.debug:
+                print(f"[VideoRenderer] Video saved successfully")
+            
+        except ImportError as e:
+            print(f"❌ Error: {e}")
+            print(f"Note: Video export requires opencv-python or matplotlib and ffmpeg.")
+            print(f"Install with: pip install opencv-python matplotlib")
+            print(f"And ensure ffmpeg is installed on your system.")
+            raise  # Re-raise the exception so the caller knows it failed
+        except Exception as e:
+            print(f"❌ Error exporting video: {e}")
+            if self.debug:
+                import traceback
+                traceback.print_exc()
+            raise  # Re-raise the exception so the caller knows it failed
+    
+    def _save_video_opencv(self, frames: list, audio_signal: np.ndarray, output_path: str) -> None:
+        """Save video using OpenCV backend."""
+        import cv2
+        import tempfile
+        import os
+        
+        if self.debug:
+            print(f"[VideoRenderer] Using OpenCV backend")
+        
+        # Create temporary video without audio
+        temp_video = tempfile.NamedTemporaryFile(suffix='_novideo.mp4', delete=False)
+        temp_video_path = temp_video.name
+        temp_video.close()
+        
+        # Initialize video writer
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        out = cv2.VideoWriter(temp_video_path, fourcc, self.fps, (self.width, self.height))
+        
+        if self.debug:
+            print(f"[VideoRenderer] Writing {len(frames)} frames to video...")
+        
+        # Write frames
+        for i, frame_data in enumerate(frames):
+            # Convert from normalized grayscale to BGR
+            frame_bgr = self._convert_to_bgr(frame_data)
+            out.write(frame_bgr)
+            
+            if self.debug and i % 100 == 0:
+                print(f"[VideoRenderer] Wrote frame {i}/{len(frames)}")
+        
+        out.release()
+        
+        if self.debug:
+            print(f"[VideoRenderer] Adding audio track...")
+        
+        # Now add audio using ffmpeg
+        self._add_audio_to_video(temp_video_path, audio_signal, output_path)
+        
+        # Clean up temporary file
+        os.unlink(temp_video_path)
+        
+        print(f"✓ Video exported to: {output_path}")
+    
+    def _save_video_matplotlib(self, frames: list, audio_signal: np.ndarray, output_path: str) -> None:
+        """Save video using matplotlib backend (slower but no opencv required)."""
+        import tempfile
+        import os
+        from matplotlib.animation import FFMpegWriter
+        
+        if self.debug:
+            print(f"[VideoRenderer] Using matplotlib backend")
+        
+        # Create figure
+        fig, ax = plt.subplots(figsize=(self.width/100, self.height/100), dpi=100)
+        ax.set_position([0, 0, 1, 1])
+        ax.axis('off')
+        
+        # Initialize plot
+        im = ax.imshow(frames[0], cmap=self.colormap, aspect='auto')
+        
+        # Create temporary video
+        temp_video = tempfile.NamedTemporaryFile(suffix='_novideo.mp4', delete=False)
+        temp_video_path = temp_video.name
+        temp_video.close()
+        
+        # Setup writer
+        writer = FFMpegWriter(fps=self.fps, bitrate=5000)
+        
+        if self.debug:
+            print(f"[VideoRenderer] Writing {len(frames)} frames with matplotlib...")
+        
+        with writer.saving(fig, temp_video_path, dpi=100):
+            for i, frame_data in enumerate(frames):
+                im.set_data(frame_data)
+                writer.grab_frame()
+                
+                if self.debug and i % 100 == 0:
+                    print(f"[VideoRenderer] Wrote frame {i}/{len(frames)}")
+        
+        plt.close(fig)
+        
+        if self.debug:
+            print(f"[VideoRenderer] Adding audio track...")
+        
+        # Add audio
+        self._add_audio_to_video(temp_video_path, audio_signal, output_path)
+        
+        # Clean up
+        os.unlink(temp_video_path)
+        
+        print(f"✓ Video exported to: {output_path}")
+    
+    def _convert_to_bgr(self, frame_data: np.ndarray) -> np.ndarray:
+        """Convert normalized grayscale frame to BGR with better color handling."""
+        if not HAS_OPENCV:
+            raise ImportError("OpenCV required for BGR conversion")
+        
+        import cv2
+        
+        # Handle colored images (3 channels)
+        if frame_data.ndim == 3 and frame_data.shape[2] == 3:
+            # Already RGB, convert to BGR
+            frame_rgb = (frame_data * 255).astype(np.uint8)
+            return cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2BGR)
+        
+        # Create RGB image with background color
+        frame_rgb = np.zeros((self.height, self.width, 3), dtype=np.uint8)
+        frame_rgb[:] = self.background_color
+        
+        # Apply foreground color where frame_data is non-zero
+        for c in range(3):
+            channel = frame_rgb[:, :, c].astype(float)
+            channel += frame_data * (self.foreground_color[c] - self.background_color[c])
+            frame_rgb[:, :, c] = np.clip(channel, 0, 255).astype(np.uint8)
+        
+        # Convert RGB to BGR for OpenCV
+        frame_bgr = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2BGR)
+        
+        return frame_bgr
+    
+    def _add_audio_to_video(self, video_path: str, audio_signal: np.ndarray, output_path: str) -> None:
+        """Add audio to video using ffmpeg with better error handling."""
+        import subprocess
+        import tempfile
+        import wave
+        import os
+        
+        if self.debug:
+            print(f"[VideoRenderer] Combining video and audio with ffmpeg...")
+        
+        # Save audio to temporary WAV file
+        temp_audio = tempfile.NamedTemporaryFile(suffix='.wav', delete=False)
+        temp_audio_path = temp_audio.name
+        temp_audio.close()
+        
+        # Write WAV file
+        audio_data = np.clip(audio_signal * 32767, -32768, 32767).astype(np.int16)
+        with wave.open(temp_audio_path, 'wb') as wav_file:
+            wav_file.setnchannels(1)
+            wav_file.setsampwidth(2)
+            wav_file.setframerate(self.sample_rate)
+            wav_file.writeframes(audio_data.tobytes())
+        
+        # Use ffmpeg to combine video and audio
+        try:
+            cmd = [
+                'ffmpeg', '-y',
+                '-i', video_path,
+                '-i', temp_audio_path,
+                '-c:v', 'libx264',
+                '-preset', 'medium',
+                '-crf', '23',
+                '-c:a', 'aac',
+                '-b:a', '192k',
+                '-strict', 'experimental',
+                '-shortest',
+                output_path
+            ]
+            
+            if self.debug:
+                print(f"[VideoRenderer] Running: {' '.join(cmd)}")
+                result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+                print(f"[VideoRenderer] ffmpeg output: {result.stderr[-500:]}")  # Last 500 chars
+            else:
+                subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            
+        except subprocess.CalledProcessError as e:
+            print(f"❌ Error running ffmpeg: {e}")
+            if self.debug:
+                print(f"ffmpeg stderr: {e.stderr}")
+            print("Make sure ffmpeg is installed on your system.")
+            raise
+        except FileNotFoundError:
+            print("❌ ffmpeg not found. Please install ffmpeg to export video with audio.")
+            print("   Ubuntu/Debian: sudo apt install ffmpeg")
+            print("   macOS: brew install ffmpeg")
+            print("   Windows: Download from https://ffmpeg.org/")
+            raise
+        finally:
+            # Clean up temporary audio file
+            if os.path.exists(temp_audio_path):
+                os.unlink(temp_audio_path)
 
 
 class OscilloscopeVisualizer(Visualizer):
@@ -459,7 +931,8 @@ class OscilloscopeVisualizer(Visualizer):
         self,
         sample_rate: int = 44100,
         window_size: int = 1024,
-        mode: Literal['waveform', 'lissajous', 'phase'] = 'waveform'
+        mode: Literal['waveform', 'lissajous', 'phase'] = 'waveform',
+        debug: bool = False
     ):
         """
         Initialize an oscilloscope visualizer.
@@ -468,9 +941,11 @@ class OscilloscopeVisualizer(Visualizer):
             sample_rate: Audio sample rate in Hz
             window_size: Size of visualization window
             mode: Display mode (waveform, lissajous, phase)
+            debug: Enable debug output
         """
-        super().__init__(sample_rate)
+        super().__init__(sample_rate, debug)
         self.window_size = window_size
+        self.mode = mode
         self.mode = mode
     
     def generate(self, signal: np.ndarray) -> np.ndarray:
@@ -615,6 +1090,251 @@ class OscilloscopeVisualizer(Visualizer):
         return image
 
 
+class CircularVisualizer(Visualizer):
+    """
+    Circular / Radial visualization.
+    
+    Displays audio in a circular pattern with customizable effects.
+    """
+    
+    def __init__(
+        self,
+        sample_rate: int = 44100,
+        num_bars: int = 64,
+        inner_radius: float = 0.2,
+        bar_width: float = 0.8,
+        smoothing: float = 0.5,
+        debug: bool = False
+    ):
+        """
+        Initialize a circular visualizer.
+        
+        Args:
+            sample_rate: Audio sample rate in Hz
+            num_bars: Number of bars in the circle
+            inner_radius: Inner radius as fraction of image size (0.0 to 1.0)
+            bar_width: Bar width as fraction of available space (0.0 to 1.0)
+            smoothing: Smoothing factor for bar heights (0.0 to 1.0)
+            debug: Enable debug output
+        """
+        super().__init__(sample_rate, debug)
+        self.num_bars = num_bars
+        self.inner_radius = inner_radius
+        self.bar_width = bar_width
+        self.smoothing = smoothing
+        self.prev_magnitudes = None
+    
+    def generate(self, signal: np.ndarray) -> np.ndarray:
+        """
+        Generate circular visualization data.
+        
+        Args:
+            signal: Audio signal
+            
+        Returns:
+            Bar magnitudes for circular display
+        """
+        # Compute FFT
+        fft_size = min(2048, len(signal))
+        if len(signal) < fft_size:
+            signal = np.pad(signal, (0, fft_size - len(signal)))
+        else:
+            signal = signal[:fft_size]
+        
+        window = np.hanning(fft_size)
+        windowed = signal * window
+        fft = np.fft.rfft(windowed)
+        magnitude = np.abs(fft)
+        
+        # Resample to num_bars
+        if len(magnitude) > self.num_bars:
+            indices = np.linspace(0, len(magnitude) - 1, self.num_bars).astype(int)
+            magnitudes = magnitude[indices]
+        else:
+            magnitudes = np.pad(magnitude, (0, self.num_bars - len(magnitude)))
+        
+        # Apply smoothing
+        if self.prev_magnitudes is not None and self.smoothing > 0:
+            magnitudes = (magnitudes * (1 - self.smoothing) + 
+                         self.prev_magnitudes * self.smoothing)
+        
+        self.prev_magnitudes = magnitudes.copy()
+        
+        # Normalize
+        max_mag = np.max(magnitudes)
+        if max_mag > 0:
+            magnitudes = magnitudes / max_mag
+        
+        return magnitudes
+    
+    def to_image_data(
+        self,
+        signal: np.ndarray,
+        height: int = 512,
+        width: int = 512
+    ) -> np.ndarray:
+        """
+        Convert circular visualization to image data.
+        
+        Args:
+            signal: Audio signal
+            height: Image height in pixels
+            width: Image width in pixels
+            
+        Returns:
+            Image data array
+        """
+        magnitudes = self.generate(signal)
+        image = np.zeros((height, width))
+        
+        center_x, center_y = width // 2, height // 2
+        max_radius = min(center_x, center_y)
+        inner_r = int(max_radius * self.inner_radius)
+        
+        # Draw each bar
+        for i, mag in enumerate(magnitudes):
+            angle = 2 * np.pi * i / self.num_bars - np.pi / 2
+            outer_r = int(inner_r + mag * (max_radius - inner_r) * self.bar_width)
+            
+            # Draw line from inner to outer radius
+            num_points = outer_r - inner_r + 1
+            for r in range(inner_r, outer_r):
+                x = int(center_x + r * np.cos(angle))
+                y = int(center_y + r * np.sin(angle))
+                if 0 <= x < width and 0 <= y < height:
+                    image[y, x] = 1.0
+        
+        return image
+
+
+class ParticleVisualizer(Visualizer):
+    """
+    Particle-based visualization.
+    
+    Displays audio as animated particles reacting to frequency content.
+    """
+    
+    def __init__(
+        self,
+        sample_rate: int = 44100,
+        num_particles: int = 100,
+        decay: float = 0.95,
+        sensitivity: float = 1.0,
+        debug: bool = False
+    ):
+        """
+        Initialize a particle visualizer.
+        
+        Args:
+            sample_rate: Audio sample rate in Hz
+            num_particles: Number of particles to simulate
+            decay: Particle velocity decay (0.0 to 1.0)
+            sensitivity: Sensitivity to audio changes
+            debug: Enable debug output
+        """
+        super().__init__(sample_rate, debug)
+        self.num_particles = num_particles
+        self.decay = decay
+        self.sensitivity = sensitivity
+        self.particles = None
+    
+    def generate(self, signal: np.ndarray) -> np.ndarray:
+        """
+        Generate particle visualization data.
+        
+        Args:
+            signal: Audio signal
+            
+        Returns:
+            Particle positions and velocities
+        """
+        # Initialize particles if needed
+        if self.particles is None:
+            self.particles = {
+                'x': np.random.rand(self.num_particles),
+                'y': np.random.rand(self.num_particles),
+                'vx': np.zeros(self.num_particles),
+                'vy': np.zeros(self.num_particles),
+                'energy': np.zeros(self.num_particles)
+            }
+        
+        # Calculate energy from signal
+        energy = np.sqrt(np.mean(signal ** 2))
+        
+        # Update particle velocities based on energy
+        for i in range(self.num_particles):
+            if energy > 0.01:
+                angle = np.random.rand() * 2 * np.pi
+                force = energy * self.sensitivity
+                self.particles['vx'][i] += np.cos(angle) * force
+                self.particles['vy'][i] += np.sin(angle) * force
+                self.particles['energy'][i] = energy
+        
+        # Update positions
+        self.particles['x'] += self.particles['vx']
+        self.particles['y'] += self.particles['vy']
+        
+        # Apply decay
+        self.particles['vx'] *= self.decay
+        self.particles['vy'] *= self.decay
+        
+        # Bounce off edges
+        self.particles['x'] = np.clip(self.particles['x'], 0, 1)
+        self.particles['y'] = np.clip(self.particles['y'], 0, 1)
+        
+        # Reverse velocity at edges
+        self.particles['vx'] = np.where(
+            (self.particles['x'] <= 0) | (self.particles['x'] >= 1),
+            -self.particles['vx'],
+            self.particles['vx']
+        )
+        self.particles['vy'] = np.where(
+            (self.particles['y'] <= 0) | (self.particles['y'] >= 1),
+            -self.particles['vy'],
+            self.particles['vy']
+        )
+        
+        return self.particles
+    
+    def to_image_data(
+        self,
+        signal: np.ndarray,
+        height: int = 512,
+        width: int = 512
+    ) -> np.ndarray:
+        """
+        Convert particle visualization to image data.
+        
+        Args:
+            signal: Audio signal
+            height: Image height in pixels
+            width: Image width in pixels
+            
+        Returns:
+            Image data array
+        """
+        particles = self.generate(signal)
+        image = np.zeros((height, width))
+        
+        # Draw particles
+        for i in range(self.num_particles):
+            x = int(particles['x'][i] * width)
+            y = int(particles['y'][i] * height)
+            energy = particles['energy'][i]
+            
+            if 0 <= x < width and 0 <= y < height:
+                # Draw particle with size based on energy
+                radius = max(1, int(energy * 10))
+                for dy in range(-radius, radius + 1):
+                    for dx in range(-radius, radius + 1):
+                        if dx*dx + dy*dy <= radius*radius:
+                            px, py = x + dx, y + dy
+                            if 0 <= px < width and 0 <= py < height:
+                                image[py, px] = min(1.0, image[py, px] + energy)
+        
+        return image
+
+
 class PianoRollVisualizer(Visualizer):
     """
     Piano Roll / Note Display visualization.
@@ -626,7 +1346,8 @@ class PianoRollVisualizer(Visualizer):
         self,
         sample_rate: int = 44100,
         time_resolution: float = 0.1,
-        pitch_range: tuple = (36, 84)  # C2 to C6
+        pitch_range: tuple = (36, 84),  # C2 to C6
+        debug: bool = False
     ):
         """
         Initialize a piano roll visualizer.
@@ -635,8 +1356,9 @@ class PianoRollVisualizer(Visualizer):
             sample_rate: Audio sample rate in Hz
             time_resolution: Time resolution in seconds per column
             pitch_range: Range of MIDI notes to display (min, max)
+            debug: Enable debug output
         """
-        super().__init__(sample_rate)
+        super().__init__(sample_rate, debug)
         self.time_resolution = time_resolution
         self.pitch_range = pitch_range
         self.notes: List[Dict[str, Any]] = []

@@ -2,6 +2,98 @@
 
 All notable changes to Algorythm will be documented in this file.
 
+## [Unreleased]
+
+### Fixed - MP3 Recognition and Enhanced CLI (2025-10-24)
+
+#### CLI Color Parameter Bug Fix
+- **Fixed TypeError**: Fixed `Exporter.export() got an unexpected keyword argument 'background_color'` error
+- **Correct Parameter Flow**: Color parameters now correctly passed to `VideoRenderer` instead of `Exporter`
+- **Working Color Options**: `--color` and `--background` flags now function properly
+- **Fixed ffmpeg Subprocess**: Fixed `capture_output` conflict in subprocess call (line 901)
+
+#### Dependency Management
+- **Fixed pydub Installation**: Added `pydub>=0.25.1` to `install_requires` in setup.py (previously only in extras_require)
+- **Automatic MP3 Support**: MP3/OGG/FLAC support now installs automatically with algorythm
+- **Better Error Messages**: Enhanced error handling with platform-specific installation instructions
+
+#### Audio Loading Improvements
+- **Added HAS_PYDUB Flag**: Module-level flag for early pydub detection
+- **ffmpeg Detection**: Automatic detection of ffmpeg/avconv availability
+- **Enhanced Error Handling**: Clear, actionable error messages when dependencies are missing
+- **Multiple Error Types**: Separate handling for ImportError, RuntimeError, and FileNotFoundError
+
+#### CLI Enhancements
+- **New Command: `formats`**: Check supported formats and dependency status
+  - Shows audio input formats (WAV, MP3, OGG, FLAC, M4A, AAC)
+  - Shows video output formats
+  - Displays dependency status (pydub, ffmpeg, opencv, matplotlib)
+  - Provides installation instructions for missing dependencies
+
+- **Enhanced `visualize` Command**:
+  - `--color` option: Choose foreground color (blue, red, green, purple, orange, cyan, magenta)
+  - `--background` option: Choose background color (black, white, dark, light)
+  - `--bars` option: Customize bar count for circular visualizer
+  - `--debug` flag: Enable debug mode with detailed error messages
+  - Better progress indicators and status messages
+
+- **Improved `info` Command**:
+  - Enhanced error handling
+  - Better formatting
+  - Clearer dependency messages
+
+#### Documentation
+- **CLI_MP3_GUIDE.md**: Complete guide for MP3 visualization with CLI
+- **CLI_QUICK_REF.md**: Quick reference card for all CLI commands
+- **BUGFIX_MP3_CLI_SUMMARY.md**: Detailed summary of changes
+
+#### Example Usage
+```bash
+# Check what's supported
+algorythm formats
+
+# Create colorful visualization
+algorythm visualize song.mp3 --color purple --background dark --bars 128
+
+# Process section of file
+algorythm visualize song.mp3 --offset 30 --duration 60
+
+# High-quality 4K video
+algorythm visualize song.mp3 -w 3840 --height 2160 --fps 60
+```
+
+### Added - MP4 Export for Visualizers
+
+#### Direct MP4 Export
+- **MP4 Format Support**: Export audio with synchronized visualizations to MP4 video files
+- **Integrated with Exporter**: Use `Exporter.export()` with `.mp4` file extension
+- **Multiple Visualizers**: Support for all 6 built-in visualizers
+- **Automatic Fallback**: Uses default WaveformVisualizer if none specified
+
+#### Video Configuration
+- **Customizable Dimensions**: Set video width and height (HD, Full HD, 4K, custom)
+- **Frame Rate Control**: Adjustable FPS (24, 30, 60, etc.)
+- **Progress Indicators**: Real-time progress feedback during rendering
+- **Quality Settings**: Uses ffmpeg with optimized encoding settings
+
+#### Supported Visualizers
+- WaveformVisualizer - Shows amplitude over time
+- SpectrogramVisualizer - Displays frequency content as heatmap
+- FrequencyScopeVisualizer - Real-time frequency spectrum bars
+- CircularVisualizer - Radial frequency display
+- OscilloscopeVisualizer - Classic oscilloscope views
+- ParticleVisualizer - Animated particles reacting to audio
+
+#### Documentation
+- **MP4_EXPORT_GUIDE.md**: Complete guide with examples and best practices
+- **examples/mp4_export_example.py**: 5 detailed examples showcasing different visualizers
+- **Test Coverage**: Added tests for MP4 export functionality
+
+#### Dependencies
+- Requires `opencv-python` and `ffmpeg` for MP4 export
+- Graceful fallback to WAV export if dependencies missing
+- Optional install via `pip install -e ".[video]"`
+
 ## [0.3.0] - 2025-10-21
 
 ### Added - Volume Control System

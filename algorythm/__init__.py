@@ -4,7 +4,7 @@ Algorythm: A Python Library for Algorithmic Music
 A declarative, Manim-inspired library for generating algorithmic music.
 """
 
-__version__ = '0.3.0'
+__version__ = '0.4.0'
 
 from algorythm.synth import Synth, Oscillator, Filter, ADSR, SynthPresets, FMSynth, WavetableSynth
 from algorythm.sequence import Motif, Rhythm, Arpeggiator, Scale, Chord, Tuning
@@ -14,6 +14,7 @@ from algorythm.structure import (
     EQ, Phaser, Tremolo, Bitcrusher, SpatialAudio, VolumeControl
 )
 from algorythm.export import RenderEngine, Exporter
+from algorythm.audio_loader import load_audio, visualize_audio_file, AudioFile
 from algorythm.generative import LSystem, CellularAutomata, ConstraintBasedComposer, GeneticAlgorithmImproviser
 from algorythm.automation import Automation, AutomationTrack, DataSonification
 from algorythm.visualization import WaveformVisualizer, SpectrogramVisualizer, FrequencyScopeVisualizer, VideoRenderer, OscilloscopeVisualizer, PianoRollVisualizer
@@ -67,6 +68,10 @@ __all__ = [
     # Export
     'RenderEngine',
     'Exporter',
+    # Audio Loading
+    'load_audio',
+    'visualize_audio_file',
+    'AudioFile',
     # Generative
     'LSystem',
     'CellularAutomata',

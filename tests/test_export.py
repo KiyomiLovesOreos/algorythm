@@ -73,3 +73,62 @@ class TestExporter:
             finally:
                 if os.path.exists(temp_file):
                     os.unlink(temp_file)
+    
+    def test_export_mp4_with_visualizer(self):
+        """Test exporting to MP4 format with visualizer."""
+        try:
+            import cv2
+            
+            from algorythm.visualization import WaveformVisualizer
+            
+            exporter = Exporter()
+            signal = np.sin(2 * np.pi * 440 * np.linspace(0, 0.5, 22050))  # Short 0.5s signal
+            visualizer = WaveformVisualizer(sample_rate=44100)
+            
+            with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as f:
+                temp_file = f.name
+            
+            try:
+                exporter.export(
+                    signal,
+                    temp_file,
+                    sample_rate=44100,
+                    visualizer=visualizer,
+                    video_width=640,
+                    video_height=480,
+                    video_fps=30
+                )
+                assert os.path.exists(temp_file)
+                assert os.path.getsize(temp_file) > 0
+            finally:
+                if os.path.exists(temp_file):
+                    os.unlink(temp_file)
+        except ImportError:
+            pytest.skip("opencv-python not installed, skipping MP4 test")
+    
+    def test_export_mp4_no_visualizer(self):
+        """Test exporting to MP4 without specifying visualizer (uses default)."""
+        try:
+            import cv2
+            
+            exporter = Exporter()
+            signal = np.sin(2 * np.pi * 440 * np.linspace(0, 0.5, 22050))  # Short 0.5s signal
+            
+            with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as f:
+                temp_file = f.name
+            
+            try:
+                exporter.export(
+                    signal,
+                    temp_file,
+                    sample_rate=44100,
+                    video_width=640,
+                    video_height=480,
+                    video_fps=30
+                )
+                assert os.path.exists(temp_file)
+            finally:
+                if os.path.exists(temp_file):
+                    os.unlink(temp_file)
+        except ImportError:
+            pytest.skip("opencv-python not installed, skipping MP4 test")
