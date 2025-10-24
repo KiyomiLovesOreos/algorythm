@@ -221,7 +221,7 @@ class SpectrogramVisualizer(Visualizer):
     
     def generate(self, signal: np.ndarray) -> np.ndarray:
         """
-        Generate spectrogram data using STFT.
+        Generate spectrogram data using STFT (optimized vectorized version).
         
         Args:
             signal: Audio signal
@@ -236,28 +236,29 @@ class SpectrogramVisualizer(Visualizer):
             self._log_debug("Signal too short for spectrogram")
             return np.array([[]])
         
-        # Initialize spectrogram array
-        spectrogram = np.zeros((self.window_size // 2 + 1, num_frames))
+        # Vectorized STFT using stride tricks for efficiency
+        # Create a view into the signal with overlapping windows
+        from numpy.lib.stride_tricks import as_strided
         
-        # Compute STFT
-        for frame_idx in range(num_frames):
-            start = frame_idx * self.hop_size
-            end = start + self.window_size
-            
-            if end > len(signal):
-                break
-            
-            # Extract and window the frame
-            frame = signal[start:end] * self.window
-            
-            # Compute FFT
-            fft = np.fft.rfft(frame)
-            
-            # Convert to magnitude (dB scale)
-            magnitude = np.abs(fft)
-            magnitude_db = 20 * np.log10(magnitude + 1e-10)  # Avoid log(0)
-            
-            spectrogram[:, frame_idx] = magnitude_db
+        # Calculate shape and strides for windowed view
+        shape = (num_frames, self.window_size)
+        strides = (signal.strides[0] * self.hop_size, signal.strides[0])
+        
+        # Create windowed view (no copy)
+        frames = as_strided(signal, shape=shape, strides=strides, writeable=False)
+        
+        # Apply window function (broadcast)
+        windowed_frames = frames * self.window
+        
+        # Compute FFT for all frames at once (much faster)
+        fft_result = np.fft.rfft(windowed_frames, axis=1)
+        
+        # Convert to magnitude (dB scale)
+        magnitude = np.abs(fft_result)
+        spectrogram = 20 * np.log10(magnitude + 1e-10)  # Avoid log(0)
+        
+        # Transpose to match expected output shape (freq x time)
+        spectrogram = spectrogram.T
         
         self._log_debug(f"Generated spectrogram: {spectrogram.shape[0]} freq bins x {spectrogram.shape[1]} time frames")
         return spectrogram
@@ -527,6 +528,11 @@ class VideoRenderer:
     Renders synchronized video with audio visualization.
     Enhanced with multiple visualizer support and extensive customization.
     Supports both OpenCV and matplotlib backends.
+    
+    Performance Tips:
+    - Lower resolution (720p instead of 1080p) significantly speeds up rendering
+    - Reduce fps (24 instead of 30) for 20% speed improvement
+    - Use CircularVisualizer or WaveformVisualizer (faster than SpectrogramVisualizer)
     """
     
     def __init__(
@@ -579,7 +585,7 @@ class VideoRenderer:
         progress_callback: Optional[callable] = None
     ) -> list:
         """
-        Render video frames from audio signal with progress tracking.
+        Render video frames from audio signal with progress tracking (optimized).
         
         Args:
             signal: Audio signal
@@ -597,6 +603,118 @@ class VideoRenderer:
             print(f"[VideoRenderer] Rendering {num_frames} frames...")
             print(f"[VideoRenderer] Signal length: {len(signal)} samples ({len(signal)/self.sample_rate:.2f}s)")
         
+        # Optimize for spectrogram visualizer - process entire signal at once
+        if isinstance(visualizer, SpectrogramVisualizer):
+            if self.debug:
+                print(f"[VideoRenderer] Using optimized spectrogram rendering...")
+            frames = self._render_spectrogram_optimized(signal, visualizer, num_frames, progress_callback)
+        else:
+            # Standard frame-by-frame rendering for other visualizers
+            frames = self._render_frames_standard(signal, visualizer, num_frames, progress_callback)
+        
+        if self.debug:
+            print(f"[VideoRenderer] Completed rendering {len(frames)} frames")
+        
+        # Save video if output path provided
+        if output_path:
+            self._save_video(frames, signal, output_path)
+        
+        return frames
+    
+    def _render_spectrogram_optimized(
+        self,
+        signal: np.ndarray,
+        visualizer: SpectrogramVisualizer,
+        num_frames: int,
+        progress_callback: Optional[callable] = None
+    ) -> list:
+        """
+        Optimized spectrogram rendering - compute full spectrogram once, then slice.
+        
+        Args:
+            signal: Audio signal
+            visualizer: SpectrogramVisualizer instance
+            num_frames: Number of frames to render
+            progress_callback: Optional progress callback
+            
+        Returns:
+            List of frame data
+        """
+        # Compute spectrogram for entire signal at once (much faster)
+        full_spectrogram = visualizer.generate(signal)
+        
+        if full_spectrogram.size == 0 or full_spectrogram.shape[0] == 0 or full_spectrogram.shape[1] == 0:
+            if self.debug:
+                print(f"[VideoRenderer] Empty spectrogram, returning blank frames")
+            return [np.zeros((self.height, self.width)) for _ in range(num_frames)]
+        
+        # Pre-compute resize indices for efficiency
+        spec_height, spec_width = full_spectrogram.shape
+        row_indices = (np.arange(self.height) * spec_height / self.height).astype(int)
+        row_indices = np.clip(row_indices, 0, spec_height - 1)
+        
+        # Calculate how many spectrogram columns per video frame
+        cols_per_frame = max(1, spec_width // num_frames)
+        
+        # Normalize the entire spectrogram once
+        spec_min = np.percentile(full_spectrogram, 5)
+        spec_max = np.percentile(full_spectrogram, 95)
+        normalized_spec = np.clip((full_spectrogram - spec_min) / (spec_max - spec_min + 1e-10), 0, 1)
+        normalized_spec = np.flipud(normalized_spec)  # Flip once
+        
+        frames = []
+        for frame_idx in range(num_frames):
+            # Calculate which columns of spectrogram to use for this frame
+            start_col = int(frame_idx * spec_width / num_frames)
+            end_col = int((frame_idx + 1) * spec_width / num_frames)
+            end_col = min(end_col, spec_width)
+            
+            if start_col >= spec_width:
+                frames.append(np.zeros((self.height, self.width)))
+                continue
+            
+            # Extract relevant columns
+            frame_spec = normalized_spec[:, start_col:end_col]
+            
+            # Resize width to video width
+            if frame_spec.shape[1] > 0:
+                col_indices = (np.arange(self.width) * frame_spec.shape[1] / self.width).astype(int)
+                col_indices = np.clip(col_indices, 0, frame_spec.shape[1] - 1)
+                frame_resized = frame_spec[row_indices][:, col_indices]
+            else:
+                frame_resized = np.zeros((self.height, self.width))
+            
+            frames.append(frame_resized)
+            
+            # Progress callback
+            if progress_callback and frame_idx % 10 == 0:
+                progress_callback(frame_idx, num_frames)
+            
+            # Debug output
+            if self.debug and frame_idx % 100 == 0:
+                print(f"[VideoRenderer] Rendered frame {frame_idx}/{num_frames} ({100*frame_idx/num_frames:.1f}%)")
+        
+        return frames
+    
+    def _render_frames_standard(
+        self,
+        signal: np.ndarray,
+        visualizer: Visualizer,
+        num_frames: int,
+        progress_callback: Optional[callable] = None
+    ) -> list:
+        """
+        Standard frame-by-frame rendering for non-spectrogram visualizers.
+        
+        Args:
+            signal: Audio signal
+            visualizer: Visualizer instance
+            num_frames: Number of frames to render
+            progress_callback: Optional progress callback
+            
+        Returns:
+            List of frame data
+        """
         frames = []
         
         for frame_idx in range(num_frames):
@@ -612,10 +730,6 @@ class VideoRenderer:
             # Generate visualization
             if isinstance(visualizer, WaveformVisualizer):
                 frame_data = visualizer.to_image_data(chunk, self.height, self.width)
-            elif isinstance(visualizer, SpectrogramVisualizer):
-                spec_data = visualizer.generate(chunk)
-                # Resize to fit frame
-                frame_data = self._resize_spectrogram(spec_data, self.height, self.width)
             elif isinstance(visualizer, FrequencyScopeVisualizer):
                 spectrum = visualizer.generate(chunk)
                 frame_data = self._spectrum_to_image(spectrum, self.height, self.width)
@@ -637,13 +751,6 @@ class VideoRenderer:
             # Debug output every 100 frames
             if self.debug and frame_idx % 100 == 0:
                 print(f"[VideoRenderer] Rendered frame {frame_idx}/{num_frames} ({100*frame_idx/num_frames:.1f}%)")
-        
-        if self.debug:
-            print(f"[VideoRenderer] Completed rendering {len(frames)} frames")
-        
-        # Save video if output path provided
-        if output_path:
-            self._save_video(frames, signal, output_path)
         
         return frames
     
@@ -737,7 +844,7 @@ class VideoRenderer:
             raise  # Re-raise the exception so the caller knows it failed
     
     def _save_video_opencv(self, frames: list, audio_signal: np.ndarray, output_path: str) -> None:
-        """Save video using OpenCV backend."""
+        """Save video using OpenCV backend (optimized with batching)."""
         import cv2
         import tempfile
         import os
@@ -757,14 +864,35 @@ class VideoRenderer:
         if self.debug:
             print(f"[VideoRenderer] Writing {len(frames)} frames to video...")
         
-        # Write frames
+        # Pre-allocate BGR conversion arrays for efficiency
+        frame_rgb = np.zeros((self.height, self.width, 3), dtype=np.uint8)
+        
+        # Write frames with optimized conversion
+        total_frames = len(frames)
+        print_interval = max(1, total_frames // 20)  # Print progress every 5%
+        
         for i, frame_data in enumerate(frames):
-            # Convert from normalized grayscale to BGR
-            frame_bgr = self._convert_to_bgr(frame_data)
+            # Optimized BGR conversion (reuse arrays)
+            frame_rgb[:] = self.background_color
+            
+            # Handle colored images (3 channels)
+            if frame_data.ndim == 3 and frame_data.shape[2] == 3:
+                frame_rgb = (frame_data * 255).astype(np.uint8)
+                frame_bgr = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2BGR)
+            else:
+                # Grayscale to colored
+                for c in range(3):
+                    channel = frame_rgb[:, :, c].astype(float)
+                    channel += frame_data * (self.foreground_color[c] - self.background_color[c])
+                    frame_rgb[:, :, c] = np.clip(channel, 0, 255).astype(np.uint8)
+                frame_bgr = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2BGR)
+            
             out.write(frame_bgr)
             
-            if self.debug and i % 100 == 0:
-                print(f"[VideoRenderer] Wrote frame {i}/{len(frames)}")
+            # Progress feedback
+            if (i + 1) % print_interval == 0 or i == total_frames - 1:
+                progress = 100 * (i + 1) / total_frames
+                print(f"[VideoRenderer] Writing frames: {progress:.1f}% ({i+1}/{total_frames})")
         
         out.release()
         

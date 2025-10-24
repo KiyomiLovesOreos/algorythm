@@ -263,13 +263,19 @@ def visualize_audio_file(
     This is a convenience function that loads audio and exports
     with visualization in one step.
     
+    Performance Tips:
+        - Use 1280x720 (720p) instead of 1920x1080 for 2-3x speedup
+        - Use 24 fps instead of 30 fps for 20% speedup
+        - CircularVisualizer and WaveformVisualizer are fastest
+        - Process shorter segments with duration parameter for testing
+    
     Args:
         input_file: Path to input audio file (MP3, WAV, OGG, FLAC)
         output_file: Path to output video file (MP4)
         visualizer: Visualizer instance to use
-        video_width: Video width in pixels
-        video_height: Video height in pixels
-        video_fps: Video frames per second
+        video_width: Video width in pixels (default 1920, try 1280 for speed)
+        video_height: Video height in pixels (default 1080, try 720 for speed)
+        video_fps: Video frames per second (default 30, try 24 for speed)
         offset: Start offset in seconds
         duration: Duration to process in seconds (None = entire file)
         
@@ -277,13 +283,15 @@ def visualize_audio_file(
         >>> from algorythm.audio_loader import visualize_audio_file
         >>> from algorythm.visualization import CircularVisualizer
         >>> 
+        >>> # Fast rendering with lower resolution
         >>> viz = CircularVisualizer(sample_rate=44100, num_bars=64)
         >>> visualize_audio_file(
         ...     'my_song.mp3',
         ...     'my_song_video.mp4',
         ...     visualizer=viz,
-        ...     video_width=1920,
-        ...     video_height=1080
+        ...     video_width=1280,  # 720p for speed
+        ...     video_height=720,
+        ...     video_fps=24
         ... )
     """
     from algorythm.export import Exporter
@@ -296,7 +304,14 @@ def visualize_audio_file(
         duration=duration
     )
     
-    print(f"✓ Loaded {len(signal)/sample_rate:.2f}s of audio at {sample_rate}Hz")
+    duration_sec = len(signal)/sample_rate
+    print(f"✓ Loaded {duration_sec:.2f}s of audio at {sample_rate}Hz")
+    
+    # Warn if file is long and high resolution
+    est_frames = int(duration_sec * video_fps)
+    if est_frames > 3000 and (video_width > 1280 or video_height > 720):
+        print(f"⚠ Warning: Rendering {est_frames} frames at {video_width}x{video_height}")
+        print(f"  This may take several minutes. Consider using 1280x720 for faster rendering.")
     
     # Update visualizer sample rate if needed
     if hasattr(visualizer, 'sample_rate'):
@@ -304,6 +319,8 @@ def visualize_audio_file(
     
     # Export with visualization
     print(f"Creating visualization video...")
+    print(f"  Resolution: {video_width}x{video_height} @ {video_fps}fps")
+    print(f"  Estimated frames: {est_frames}")
     exporter = Exporter()
     exporter.export(
         signal,
