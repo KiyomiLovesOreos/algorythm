@@ -1,0 +1,536 @@
+Metadata-Version: 2.4
+Name: algorythm
+Version: 0.4.0
+Summary: A Python Library for Algorithmic Music - Manim-inspired declarative audio synthesis with video visualization
+Home-page: https://github.com/KiyomiLovesOreos/algorythm
+Author: KiyomiLovesOreos
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Developers
+Classifier: Intended Audience :: Science/Research
+Classifier: Topic :: Multimedia :: Sound/Audio :: Sound Synthesis
+Classifier: Topic :: Multimedia :: Sound/Audio :: Analysis
+Classifier: Topic :: Multimedia :: Video :: Display
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.7
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Requires-Python: >=3.7
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: numpy>=1.19.0
+Requires-Dist: pydub>=0.25.1
+Requires-Dist: Pillow>=8.0.0
+Provides-Extra: dev
+Requires-Dist: pytest>=6.0; extra == "dev"
+Requires-Dist: pytest-cov>=2.0; extra == "dev"
+Requires-Dist: black>=21.0; extra == "dev"
+Requires-Dist: flake8>=3.9; extra == "dev"
+Provides-Extra: export
+Requires-Dist: soundfile>=0.10.0; extra == "export"
+Requires-Dist: pydub>=0.25.0; extra == "export"
+Provides-Extra: video
+Requires-Dist: opencv-python>=4.5.0; extra == "video"
+Requires-Dist: matplotlib>=3.3.0; extra == "video"
+Provides-Extra: playback
+Requires-Dist: pyaudio>=0.2.11; extra == "playback"
+Provides-Extra: gui
+Requires-Dist: pyaudio>=0.2.11; extra == "gui"
+Provides-Extra: all
+Requires-Dist: soundfile>=0.10.0; extra == "all"
+Requires-Dist: pydub>=0.25.0; extra == "all"
+Requires-Dist: opencv-python>=4.5.0; extra == "all"
+Requires-Dist: matplotlib>=3.3.0; extra == "all"
+Requires-Dist: pyaudio>=0.2.11; extra == "all"
+Dynamic: author
+Dynamic: classifier
+Dynamic: description
+Dynamic: description-content-type
+Dynamic: home-page
+Dynamic: license-file
+Dynamic: provides-extra
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary
+
+# Algorythm
+
+**A Python Library for Algorithmic Music**
+
+Designed to take code as an input and give audio as an output, like the manim animation library for Python by 3Blue1Brown.
+
+## Core Philosophy (Manim-Inspired)
+
+The library is **declarative** and uses **Object-Oriented Composition**. Users describe what the music should be, not how to generate every sample.
+
+- **Composition by Chaining**: Define elements (Synths, Motifs, Structures) and chain them together to form the final piece
+- **Time as a Variable**: Time, duration, and tempo are handled by the library engine, abstracting away complex sample rate math
+
+## Installation
+
+```bash
+pip install -e .
+```
+
+For additional export format support (FLAC, MP3, OGG, MP4 with visualization):
+```bash
+pip install -e ".[export]"
+# For MP4/video export, also install:
+pip install opencv-python
+# And ensure ffmpeg is installed on your system
+```
+
+## Library Structure
+
+| Module | Purpose | Key Classes/Concepts |
+|--------|---------|---------------------|
+| `algorythm.synth` | Defines sound sources and timbres | `Oscillator`, `Filter`, `ADSR`, `SynthPresets`, `Synth` |
+| `algorythm.sequence` | Handles rhythmic and melodic patterns | `Motif`, `Rhythm`, `Arpeggiator`, `Scale`, `Chord` |
+| `algorythm.structure` | Arranges and composes the final track | `Track`, `Composition`, `EffectChain`, `Reverb`, `Delay`, `Chorus`, `Flanger`, `Distortion`, `Compression`, `VolumeControl` |
+| `algorythm.export` | Renders and saves the final audio | `RenderEngine`, `Exporter` |
+| `algorythm.generative` | Generative composition tools | `LSystem`, `CellularAutomata` |
+| `algorythm.automation` | Parameter automation and data sonification | `Automation`, `AutomationTrack`, `DataSonification` |
+| `algorythm.visualization` | Synchronized audio visualization | `WaveformVisualizer`, `SpectrogramVisualizer`, `FrequencyScopeVisualizer`, `VideoRenderer` |
+| `algorythm.sampler` | Sample playback and manipulation | `Sample`, `Sampler` |
+
+## Quick Start
+
+### Basic Synthesis
+
+Define a custom instrument (a Synth) once, then reference it repeatedly:
+
+```python
+from algorythm.synth import Synth, Filter, ADSR
+
+# Create a warm synth sound
+warm_pad = Synth(
+    waveform='saw',
+    filter=Filter.lowpass(cutoff=2000, resonance=0.6),
+    envelope=ADSR(attack=1.5, decay=0.5, sustain=0.8, release=2.0)
+)
+```
+
+### Sequencing and Composition
+
+Define a musical idea (Motif) and apply it to a structured timeline (Track):
+
+```python
+from algorythm.sequence import Motif, Scale
+from algorythm.structure import Composition, Reverb
+
+# Create a simple, rising motif
+melody = Motif.from_intervals([0, 2, 4, 7], scale=Scale.major('C'))
+
+# Create the main composition structure
+final_track = Composition(tempo=120) \
+    .add_track('Bassline', warm_pad) \
+    .repeat_motif(melody, bars=8) \
+    .transpose(semitones=5) \
+    .add_fx(Reverb(mix=0.4))
+```
+
+### Rendering and Export
+
+The render function handles the heavy lifting, generating audio samples:
+
+```python
+# Render as audio
+final_track.render(
+    file_path='epic_track.wav',
+    quality='high',
+    formats=['wav']  # Supports ['flac', 'mp3', 'ogg'] with additional dependencies
+)
+
+# 🎬 NEW: Export as MP4 with visualization using Exporter directly!
+from algorythm.export import Exporter
+from algorythm.visualization import WaveformVisualizer, SpectrogramVisualizer
+
+# Generate your audio signal
+audio_signal = final_track.render(return_signal=True)
+
+# Create a visualizer
+visualizer = SpectrogramVisualizer(sample_rate=44100)
+
+# Export as MP4
+exporter = Exporter()
+exporter.export(
+    audio_signal,
+    'epic_track.mp4',
+    sample_rate=44100,
+    visualizer=visualizer,
+    video_width=1920,
+    video_height=1080,
+    video_fps=30
+)
+```
+
+**Video Export Features:**
+- 6 built-in visualizers: waveform, spectrogram, frequency scope, circular, oscilloscope, particle
+- Direct MP4 export via `Exporter.export()` with `.mp4` extension
+- Full HD support (1080p, 4K, custom resolutions)
+- Customizable video dimensions and frame rates
+- Synchronized audio and video
+- See `MP4_EXPORT_GUIDE.md` for complete MP4 export documentation
+- See `VIDEO_EXPORT_GUIDE.md` for advanced video rendering
+
+## Examples
+
+The `examples/` directory contains several demonstration scripts:
+
+- `basic_synthesis.py` - Simple synth sound generation
+- `composition_example.py` - Full composition workflow (as shown in the problem statement)
+- `advanced_example.py` - Multiple tracks, effects, and transformations
+- `mp4_export_example.py` - **NEW!** MP4 video export with various visualizers
+
+Run an example:
+```bash
+cd examples
+python composition_example.py
+# Or try the new MP4 export examples:
+python mp4_export_example.py
+```
+
+## API Reference
+
+### Synth Module
+
+**Oscillator**: Generates basic waveforms (sine, square, saw, triangle, noise)
+```python
+from algorythm.synth import Oscillator
+osc = Oscillator(waveform='sine', frequency=440.0, amplitude=1.0)
+# Noise waveform for percussion and effects
+noise = Oscillator(waveform='noise')
+```
+
+**Filter**: Applies frequency filtering (lowpass, highpass, bandpass, notch)
+```python
+from algorythm.synth import Filter
+lpf = Filter.lowpass(cutoff=1000, resonance=0.5)
+```
+
+**ADSR**: Attack, Decay, Sustain, Release envelope
+```python
+from algorythm.synth import ADSR
+envelope = ADSR(attack=0.1, decay=0.2, sustain=0.7, release=0.3)
+```
+
+**Synth**: Main synthesizer combining oscillator, filter, and envelope
+```python
+from algorythm.synth import Synth, Filter, ADSR
+synth = Synth(waveform='saw', filter=Filter.lowpass(2000), envelope=ADSR())
+```
+
+**SynthPresets**: Pre-configured synth sounds
+```python
+from algorythm.synth import SynthPresets
+warm_pad = SynthPresets.warm_pad()
+pluck = SynthPresets.pluck()
+bass = SynthPresets.bass()
+```
+
+### Sequence Module
+
+**Tuning**: Microtonal and alternative temperament support
+```python
+from algorythm.sequence import Tuning, Scale
+# 19-tone equal temperament
+tuning = Tuning.equal_temperament(19)
+# Just intonation
+tuning_ji = Tuning.just_intonation()
+# Use with scales
+scale = Scale.major('C', octave=4, tuning=tuning)
+```
+
+**Scale**: Musical scale definitions
+```python
+from algorythm.sequence import Scale
+c_major = Scale.major('C', octave=4)
+a_minor = Scale.minor('A', octave=3)
+# With custom tuning
+scale_19tet = Scale.major('C', octave=4, tuning=Tuning.equal_temperament(19))
+```
+
+**Chord**: Musical chord definitions
+```python
+from algorythm.sequence import Chord
+c_major_chord = Chord.major('C', octave=4)
+a_minor7_chord = Chord.minor7('A', octave=3)
+# Get frequencies from chord
+freqs = c_major_chord.get_frequencies()
+# Convert chord to motif for arpeggiation
+motif = c_major_chord.to_motif()
+```
+
+**Motif**: Musical motif with intervals and durations
+```python
+from algorythm.sequence import Motif, Scale
+melody = Motif.from_intervals([0, 2, 4, 7], scale=Scale.major('C'))
+transposed = melody.transpose(semitones=5)
+reversed_melody = melody.reverse()
+inverted = melody.invert()
+```
+
+**Arpeggiator**: Generates arpeggios from motifs
+```python
+from algorythm.sequence import Arpeggiator
+arp = Arpeggiator(pattern='up-down', octaves=2)
+arpeggiated = arp.arpeggiate(melody)
+```
+
+### Structure Module
+
+**Composition**: Main composition container
+```python
+from algorythm.structure import Composition
+comp = Composition(tempo=120)
+comp.add_track('Lead', synth).repeat_motif(melody, bars=4)
+```
+
+**Volume Control**: Master and track-level volume control with fade support
+```python
+from algorythm.structure import Composition, VolumeControl
+
+# Set individual track volumes
+comp.set_track_volume('Bass', 0.8)
+comp.set_track_volume('Lead', 1.0)
+
+# Set master volume
+comp.set_master_volume(0.9)
+
+# Add fade in/out
+comp.fade_in(1.0).fade_out(2.0)
+
+# Use VolumeControl utilities
+volume_linear = VolumeControl.db_to_linear(-6.0)  # Convert -6 dB to linear
+volume_db = VolumeControl.linear_to_db(0.5)  # Convert 0.5 linear to dB
+audio_with_volume = VolumeControl.apply_db_volume(signal, -3.0)  # Apply -3 dB
+normalized = VolumeControl.normalize(signal, target_db=-3.0)  # Normalize to -3 dB
+faded = VolumeControl.fade(signal, fade_in=1.0, fade_out=2.0, curve='exponential')
+```
+
+**Effects**: Audio effects (Reverb, Delay, Chorus, Flanger, Distortion, Compression)
+```python
+from algorythm.structure import Reverb, Delay, Flanger, Distortion, Compression
+reverb = Reverb(mix=0.3, room_size=0.5)
+delay = Delay(delay_time=0.5, feedback=0.3, mix=0.3)
+flanger = Flanger(rate=0.5, depth=0.5, mix=0.5)
+distortion = Distortion(drive=0.7, tone=0.5, mix=1.0)
+compression = Compression(threshold=-20.0, ratio=4.0, attack=0.005, release=0.1)
+```
+
+**SpatialAudio**: 3D positioning and spatial audio mixing
+```python
+from algorythm.structure import SpatialAudio
+spatial = SpatialAudio(position=(2.0, 1.0, 0.0))
+spatial.set_position(x=3.0, y=0.5, z=-1.0)
+stereo_output = spatial.apply(mono_signal)  # Returns stereo with panning and distance attenuation
+```
+
+### Export Module
+
+**Exporter**: Exports audio to various formats (WAV, FLAC, MP3, OGG)
+```python
+from algorythm.export import Exporter
+
+# By default, files are exported to ~/Music directory
+exporter = Exporter()
+exporter.export(audio_signal, 'output.wav', sample_rate=44100, quality='high')
+
+# Use subdirectories within ~/Music
+exporter.export(audio_signal, 'myproject/track01.wav', sample_rate=44100)
+
+# Use absolute paths to save elsewhere
+exporter.export(audio_signal, '/tmp/test.wav', sample_rate=44100)
+
+# Specify custom default directory
+custom_exporter = Exporter(default_directory='/path/to/project')
+custom_exporter.export(audio_signal, 'track.wav', sample_rate=44100)
+
+# For MP3, OGG, FLAC: install with pip install -e ".[export]"
+exporter.export(audio_signal, 'output.flac', sample_rate=44100, quality='high')
+exporter.export(audio_signal, 'output.mp3', sample_rate=44100, quality='high')
+exporter.export(audio_signal, 'output.ogg', sample_rate=44100, quality='high')
+```
+
+### Generative Module
+
+**L-System**: Generate fractal-like melodies and rhythms
+```python
+from algorythm.generative import LSystem
+lsys = LSystem(axiom='A', rules={'A': 'AB', 'B': 'AC', 'C': 'A'}, iterations=3)
+lsys.generate()
+motif = lsys.to_motif(symbol_map={'A': 0, 'B': 2, 'C': 4})
+```
+
+**CellularAutomata**: Create evolving soundscapes and rhythmic textures
+```python
+from algorythm.generative import CellularAutomata
+ca = CellularAutomata(width=16, height=8)
+ca.evolve()
+motif = ca.to_motif(row=-1)  # Convert last row to motif
+rhythm = ca.to_rhythm_pattern(row=-1)  # Convert to rhythm
+```
+
+**ConstraintBasedComposer**: Generate melodies that satisfy musical rules
+```python
+from algorythm.generative import ConstraintBasedComposer
+composer = ConstraintBasedComposer(scale=Scale.major('C'))
+composer.no_large_leaps(max_interval=4).ending_on_tonic()
+motif = composer.generate(length=8)
+```
+
+**GeneticAlgorithmImproviser**: Evolve melodies using genetic algorithms
+```python
+from algorythm.generative import GeneticAlgorithmImproviser
+
+# Define fitness function (prefer ascending melodies)
+fitness = GeneticAlgorithmImproviser.fitness_ascending()
+ga = GeneticAlgorithmImproviser(fitness, population_size=50)
+ga.initialize_population(length=8)
+motif = ga.evolve(generations=100)
+```
+
+### Automation Module
+
+**Automation**: Parameter automation with various curve types
+```python
+from algorythm.automation import Automation
+# Linear fade-in
+fade_in = Automation.fade_in(duration=2.0, target_value=1.0)
+# Exponential automation
+auto = Automation(0.0, 1.0, duration=4.0, curve_type='exponential')
+value = auto.get_value(time=2.0)
+# Bézier curves for custom automation
+bezier = Automation(0.0, 1.0, duration=4.0, curve_type='bezier', control_points=[0.2, 0.8])
+```
+
+**DataSonification**: Map data to musical parameters
+```python
+from algorythm.automation import DataSonification
+# Sonify stock market data
+data = [100, 105, 103, 110, 108, 115]
+ds = DataSonification(data, param_range=(0.0, 1.0), scaling='linear')
+pitches = ds.to_pitch_sequence(scale=Scale.major('C'))
+rhythm = ds.to_rhythm_pattern(min_duration=0.25, max_duration=2.0)
+volumes = ds.to_volume_envelope(min_volume=0.1, max_volume=1.0)
+```
+
+### Visualization Module
+
+**WaveformVisualizer**: Real-time waveform display
+```python
+from algorythm.visualization import WaveformVisualizer
+viz = WaveformVisualizer(sample_rate=44100, window_size=1024)
+waveform_data = viz.generate(audio_signal)
+image = viz.to_image_data(audio_signal, height=256, width=1024)
+```
+
+**SpectrogramVisualizer**: Frequency content over time
+```python
+from algorythm.visualization import SpectrogramVisualizer
+viz = SpectrogramVisualizer(sample_rate=44100, window_size=2048, hop_size=512)
+spectrogram = viz.generate(audio_signal)
+time_axis = viz.get_time_axis(num_frames=spectrogram.shape[1])
+freq_axis = viz.get_frequency_axis()
+```
+
+**FrequencyScopeVisualizer**: Current frequency spectrum
+```python
+from algorythm.visualization import FrequencyScopeVisualizer
+viz = FrequencyScopeVisualizer(sample_rate=44100, fft_size=2048, freq_range=(20.0, 20000.0))
+spectrum = viz.generate(audio_signal)
+freqs, mags = viz.filter_frequency_range(spectrum)
+```
+
+**VideoRenderer**: Synchronized video with audio visualization
+```python
+from algorythm.visualization import VideoRenderer, WaveformVisualizer
+renderer = VideoRenderer(width=1920, height=1080, fps=30)
+viz = WaveformVisualizer()
+frames = renderer.render_frames(audio_signal, viz, output_path='output.mp4')
+```
+
+**OscilloscopeVisualizer**: Real-time waveform and phase scope
+```python
+from algorythm.visualization import OscilloscopeVisualizer
+viz = OscilloscopeVisualizer(mode='lissajous')  # 'waveform', 'lissajous', 'phase'
+image = viz.to_image_data(stereo_signal, height=512, width=512)
+```
+
+**PianoRollVisualizer**: Musical note display on a grid
+```python
+from algorythm.visualization import PianoRollVisualizer
+viz = PianoRollVisualizer()
+viz.add_note(midi_note=60, start_time=0.0, duration=0.5)
+viz.add_note(midi_note=64, start_time=0.5, duration=0.5)
+image = viz.to_image_data(duration=2.0, height=480, width=640)
+```
+
+### Sampler Module
+
+**Sample**: Load and manipulate audio samples
+```python
+from algorythm.sampler import Sample
+# Load from file
+sample = Sample(file_path='kick.wav')
+# Resample, trim, normalize
+resampled = sample.resample(target_rate=22050)
+trimmed = sample.trim(start_time=0.1, end_time=0.5)
+normalized = sample.normalize(target_level=1.0)
+```
+
+**Sampler**: Trigger and manipulate samples
+```python
+from algorythm.sampler import Sampler
+sampler = Sampler.from_file('snare.wav')
+# Trigger with pitch shift
+output = sampler.trigger(pitch_shift=12.0, volume=0.8)
+# Trigger at specific frequency
+output = sampler.trigger_note(frequency=440.0, base_frequency=220.0)
+# Create loops
+looped = sampler.create_loop(num_loops=4, fade_time=0.01)
+```
+
+**GranularSynth**: Granular synthesis for rich textures
+```python
+from algorythm.sampler import GranularSynth
+granular = GranularSynth.from_file('sample.wav', grain_size=0.05, grain_density=20.0)
+output = granular.synthesize(
+    duration=5.0,
+    position_range=(0.2, 0.8),
+    pitch_range=(-12.0, 12.0),
+    spatial_spread=0.5
+)
+```
+
+## Technical Considerations
+
+- **Audio Backend**: Pure Python/NumPy implementation for simplicity and portability
+  - For production use, consider binding to native C++ audio libraries (JUCE, RTCMix) via pyo3 or ctypes
+- **Export Formats**: 
+  - WAV export is built-in
+  - FLAC, MP3, and OGG require additional dependencies (install with `pip install -e ".[export]"`)
+  - Uses Python wrappers for ffmpeg or soundfile for reliable multi-format encoding
+
+## Development
+
+Install development dependencies:
+```bash
+pip install -e ".[dev]"
+```
+
+Run tests:
+```bash
+pytest
+```
+
+## License
+
+See LICENSE file for details.
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.

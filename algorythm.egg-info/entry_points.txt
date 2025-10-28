@@ -1,0 +1,3 @@
+[console_scripts]
+algorythm = algorythm.cli:main
+algorythm-live = algorythm.live_gui:launch
