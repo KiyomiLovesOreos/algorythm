@@ -37,6 +37,8 @@ setup(
         "numpy>=1.19.0",
         "pydub>=0.25.1",   # Required for MP3/OGG/FLAC audio file loading
         "Pillow>=8.0.0",   # Required for MP4 export fallback
+        "textual>=0.1.0",  # Required for Terminal DAW (studio command)
+        "pyyaml>=5.0",     # Required for project file handling
     ],
     extras_require={
         "dev": [

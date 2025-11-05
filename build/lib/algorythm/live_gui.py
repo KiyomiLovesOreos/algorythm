@@ -5,6 +5,8 @@ This module provides a graphical interface for live coding music with
 real-time audio feedback and code editing.
 """
 
+import tkinter as tk
+from tkinter import ttk, scrolledtext, messagebox
 from typing import Optional
 import threading
 import traceback
@@ -27,11 +29,6 @@ class LiveCodingGUI:
         Args:
             sample_rate: Sample rate in Hz
         """
-        import tkinter as tk
-        from tkinter import ttk
-        
-        self.tk = tk
-        self.ttk = ttk
         self.sample_rate = sample_rate
         self.window = tk.Tk()
         self.window.title("Algorythm Live Coding")
@@ -55,11 +52,6 @@ class LiveCodingGUI:
     
     def _setup_ui(self):
         """Setup the user interface."""
-        from tkinter import scrolledtext
-        
-        tk = self.tk
-        ttk = self.ttk
-        
         # Main container
         main_frame = ttk.Frame(self.window, padding="10")
         main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
@@ -312,8 +304,6 @@ result = audio
     
     def _play_audio(self):
         """Play the generated audio."""
-        from tkinter import messagebox
-        
         if self.current_audio is None:
             messagebox.showwarning("No Audio", "Please run code to generate audio first.")
             return
@@ -327,7 +317,7 @@ result = audio
         
         self._log_output("Playing audio...")
         self.status_label.config(text="Playing...")
-        self.stop_button.config(state=self.tk.NORMAL)
+        self.stop_button.config(state=tk.NORMAL)
         self.is_playing = True
         
         # Play in thread
@@ -359,7 +349,6 @@ result = audio
     def _save_audio(self):
         """Save the generated audio to file."""
         if self.current_audio is None:
-            from tkinter import messagebox
             messagebox.showwarning("No Audio", "Please run code to generate audio first.")
             return
         
@@ -380,7 +369,6 @@ result = audio
                 self._log_output(f"✓ Saved to: {filename}")
                 self.status_label.config(text=f"Saved: {filename}")
             except Exception as e:
-                from tkinter import messagebox
                 messagebox.showerror("Save Error", f"Failed to save audio:\n{e}")
                 self._log_output(f"✗ Save error: {e}")
     
@@ -542,25 +530,6 @@ result = comp.render()
 
 def launch():
     """Launch the live coding GUI."""
-    try:
-        import tkinter as tk
-    except ImportError as e:
-        print("\n" + "="*60)
-        print("⚠️  Tkinter GUI Not Available")
-        print("="*60)
-        print(f"\nError: {e}")
-        print("\nThe Live Coding GUI requires tkinter, which is not available.")
-        print("\nTo use the Live Coding feature, try the Terminal DAW instead:")
-        print("  algorythm studio")
-        print("\nThis starts in Live Coding view by default and works without GUI libraries.")
-        print("\nIf you want to use the tkinter GUI, install tk:")
-        print("  Ubuntu/Debian: sudo apt install python3-tk")
-        print("  Fedora: sudo dnf install python3-tkinter")
-        print("  Arch: sudo pacman -S tk")
-        print("  macOS: tk is usually included with Python")
-        print("="*60 + "\n")
-        return
-    
     gui = LiveCodingGUI()
     gui.run()
 

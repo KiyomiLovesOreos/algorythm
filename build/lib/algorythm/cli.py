@@ -245,7 +245,7 @@ For more information, visit: https://github.com/KiyomiLovesOreos/synthesia
     # Terminal DAW / Studio mode
     studio_parser = subparsers.add_parser(
         'studio',
-        help='Launch Terminal DAW (starts in Live Coding view)'
+        help='Launch Terminal DAW (Digital Audio Workstation)'
     )
     studio_parser.add_argument(
         'project_file',
@@ -1148,14 +1148,10 @@ def launch_studio(args):
         print("\n" + "="*60)
         print("🎵 Launching Algorythm Terminal DAW...")
         print("="*60)
-        print("\nStarting in Live Coding view by default")
         print("\nControls:")
-        print("  [1-6]     - Switch views")
-        print("              1: Tracker | 2: Piano Roll | 3: Arranger")
-        print("              4: Mixer | 5: Live Coding | 6: Instrument/FX")
+        print("  [1-6]     - Switch views (Tracker, Piano Roll, Arranger, Mixer, Live Coding, Instrument/FX)")
         print("  [Tab]     - Next view")
         print("  [Space]   - Play/Stop")
-        print("  [Ctrl+R]  - Run code (in Live Coding view)")
         print("  [Ctrl+S]  - Save project")
         print("  [Ctrl+O]  - Open project")
         print("  [Ctrl+P]  - Command palette")

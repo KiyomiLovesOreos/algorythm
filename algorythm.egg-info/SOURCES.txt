@@ -5,6 +5,9 @@ algorythm/__init__.py
 algorythm/audio_loader.py
 algorythm/automation.py
 algorythm/cli.py
+algorythm/cli_quick.py
+algorythm/cli_tools.py
+algorythm/effects.py
 algorythm/export.py
 algorythm/generative.py
 algorythm/live_gui.py
@@ -13,6 +16,7 @@ algorythm/sampler.py
 algorythm/sequence.py
 algorythm/structure.py
 algorythm/synth.py
+algorythm/terminal_daw.py
 algorythm/visualization.py
 algorythm.egg-info/PKG-INFO
 algorythm.egg-info/SOURCES.txt
@@ -28,6 +32,7 @@ tests/test_example_2_drums.py
 tests/test_example_3_texture.py
 tests/test_export.py
 tests/test_generative.py
+tests/test_new_features.py
 tests/test_sampler.py
 tests/test_sequence.py
 tests/test_structure.py
