@@ -1,0 +1,69 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "algorythm"
+version = "0.4.0"
+description = "A Python Library for Algorithmic Music - Manim-inspired declarative audio synthesis with video visualization"
+readme = "README.md"
+requires-python = ">=3.7"
+license = {text = "MIT"}
+authors = [
+    {name = "KiyomiLovesOreos"},
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Topic :: Multimedia :: Sound/Audio :: Sound Synthesis",
+    "Topic :: Multimedia :: Sound/Audio :: Analysis",
+    "Topic :: Multimedia :: Video :: Display",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+]
+dependencies = [
+    "numpy>=1.19.0",
+    "pydub>=0.25.1",
+    "Pillow>=8.0.0",
+    "pyyaml>=5.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=6.0",
+    "pytest-cov>=2.0",
+    "black>=21.0",
+    "flake8>=3.9",
+]
+export = [
+    "soundfile>=0.10.0",
+    "pydub>=0.25.0",
+]
+video = [
+    "opencv-python>=4.5.0",
+    "matplotlib>=3.3.0",
+]
+playback = [
+    "pyaudio>=0.2.11",
+]
+gui = [
+    "pyaudio>=0.2.11",
+]
+all = [
+    "soundfile>=0.10.0",
+    "pydub>=0.25.0",
+    "opencv-python>=4.5.0",
+    "matplotlib>=3.3.0",
+    "pyaudio>=0.2.11",
+]
+
+[project.urls]
+Homepage = "https://github.com/KiyomiLovesOreos/algorythm"
+
+[project.scripts]
+algorythm = "algorythm.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["algorythm*"]

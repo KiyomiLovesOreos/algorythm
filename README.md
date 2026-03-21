@@ -1,96 +1,149 @@
 # Algorythm
 
-A terminal-based digital audio workstation (DAW) for algorithmic music composition in Python.
+A Python library for making music with code.
 
-## Overview
+## What is it?
 
-Algorythm is a powerful Python library for creating music with code. It provides a flexible and expressive set of tools for synthesis, sequencing, and arrangement. Whether you are a developer, a musician, or an artist, Algorythm allows you to explore the intersection of code and music.
+Algorythm lets you create music by writing Python. You can synthesize sounds, build melodies, add effects, and export your tracks to audio files. It's designed to be simple enough for beginners but flexible enough for complex compositions.
 
-The project also includes a vision for a full-featured, keyboard-driven, terminal-based DAW experience with multiple composition workflows, including a piano roll, a tracker, and live coding.
+## Install
 
-## Features
+Clone this repo and install:
 
-*   **Powerful Synthesis Engines**: Basic, FM, Wavetable, Physical Modeling, Additive, and Granular synthesis.
-*   **Extensive Audio Effects**: A wide range of effects including reverb, delay, chorus, distortion, compression, and more.
-*   **50+ Instrument Presets**: A large collection of ready-to-use instrument presets.
-*   **Advanced Sequencing**: Create complex musical patterns with motifs, rhythms, arpeggiators, and scales.
-*   **Generative Music Tools**: Explore algorithmic composition with L-Systems, Cellular Automata, and more.
-*   **Automation**: Automate any parameter with curves.
-*   **Video Visualization**: Render beautiful visualizations of your music to MP4 video, with optimized performance.
-*   **Flexible Export**: Export your creations to WAV, MP3, and FLAC formats.
-
-## Getting Started
-
-Install Algorythm using pip:
 ```bash
 pip install -e .
 ```
 
-## Example Usage
+## Quick Start
 
-Create your first song with just a few lines of Python:
+Here's how to make your first sound:
+
 ```python
-from algorythm.synth import SynthPresets
-from algorythm.sequence import Motif, Scale
-from algorythm.structure import Composition
+from algorythm import Synth, Exporter
 
-# 1. Pick an instrument
-my_instrument = SynthPresets.pluck()
+# Make a synth and play a note
+synth = Synth(waveform='sine')
+audio = synth.generate_note(frequency=440, duration=1.0)
 
-# 2. Create a melody
-my_melody = Motif.from_intervals([0, 2, 4, 5], scale=Scale.major('C'))
+# Save it
+exporter = Exporter()
+exporter.export(audio, 'my_sound.wav')
+```
 
-# 3. Put it all together
+Want to make something more musical? Use the composition tools:
+
+```python
+from algorythm import Composition, SynthPresets, Scale, Motif
+
+# Pick an instrument preset
+instrument = SynthPresets.pluck()
+
+# Create a melody in C major
+melody = Motif.from_intervals([0, 2, 4, 5, 7], scale=Scale.major('C'))
+
+# Build a composition
 song = Composition(tempo=120)
-song.add_track('MyTrack', my_instrument)
-song.repeat_motif(my_melody, bars=2)
-song.render('my_first_song.wav')
-
-print("Your song is ready! Check 'my_first_song.wav'")
+song.add_track('melody', instrument)
+song.play_motif(melody, start=0.0)
+song.render('my_song.wav')
 ```
 
-## Instruments & Effects
+## What can you do with it?
 
-Algorythm comes with over 50 instrument presets and a wide variety of audio effects. You can find a complete list in the [Instruments and Effects Guide](docs/INSTRUMENTS_AND_EFFECTS.md).
+### Synthesis
+- Multiple synthesis engines (basic oscillators, FM, wavetable, physical modeling, additive)
+- 50+ instrument presets ready to use
+- Build custom instruments from scratch
 
-## Video Visualization
+### Sequencing
+- Create melodies with motifs and scales
+- Build rhythms and drum patterns
+- Arpeggiate chords automatically
+- Support for microtonal tunings
 
-Create stunning video visualizations of your audio files with optimized performance. The new streaming renderer is 4-5x faster and uses 80-90% less memory.
+### Effects
+- Time-based: reverb, delay, chorus, flanger, phaser
+- Dynamics: compression, limiting, gating
+- Distortion: overdrive, fuzz, distortion
+- Modulation: tremolo, vibrato, auto-pan, ring modulation
+- Creative: stutter, freeze, beat repeat, bit crushing
 
-```python
-from algorythm.audio_loader import visualize_audio_file
-from algorythm.visualization import CircularVisualizer
+### Composition
+- Multi-track arrangements
+- Tempo and time signature control
+- Parameter automation over time
+- Effect chains per track
 
-viz = CircularVisualizer(sample_rate=44100, num_bars=64)
-visualize_audio_file('song.mp3', 'output.mp4', viz,
-                     video_width=1280, video_height=720, video_fps=24)
-```
+### Generative Music
+- L-Systems for melodic generation
+- Cellular automata for rhythm patterns
+- Constraint-based composition
+- Genetic algorithm improvisation
 
-## Terminal DAW
+### Audio Processing
+- Load and process existing audio files
+- Sample-based synthesis
+- Granular synthesis
+- Data sonification (turn data into sound)
 
-Algorythm is evolving into a terminal-based DAW. The planned features include:
-*   **Multiple Composition Views**: Piano Roll, Tracker, and Arranger.
-*   **Live Coding**: A Python REPL to manipulate your composition in real-time.
-*   **Keyboard-First Workflow**: A fast and efficient, keyboard-driven interface.
+### Visualization
+- Render audio to video with visualizations
+- Waveform, spectrogram, frequency scope
+- Oscilloscope and piano roll views
+- Multiple visualizer styles
 
-For more details, see the [Terminal DAW Design Doc](docs/TERMINAL_DAW_DESIGN_DOC.md).
+### Export
+- WAV, MP3, FLAC formats
+- Video export with audio visualization
+- Optimized streaming renderer for video
 
 ## Documentation
 
-For more detailed information, please refer to the documentation in the `docs` directory.
-- [Beginner's Guide](docs/BEGINNER_GUIDE.md)
-- [Complete Feature List](docs/COMPLETE_FEATURE_LIST.md)
-- [Instruments and Effects Guide](docs/INSTRUMENTS_AND_EFFECTS.md)
-- [Video Optimization Guide](docs/VIDEO_OPTIMIZATION_GUIDE.md)
+Check the docs folder for detailed guides:
 
-## Installation
+- `GETTING_STARTED.md` - Your first steps with Algorythm
+- `SYNTHESIS.md` - How synthesis works and available instruments
+- `SEQUENCING.md` - Creating melodies, rhythms, and patterns
+- `EFFECTS.md` - Complete effects reference
+- `COMPOSITION.md` - Building complete tracks
+- `GENERATIVE.md` - Algorithmic composition techniques
+- `VISUALIZATION.md` - Creating audio visualizations
+- `API_REFERENCE.md` - Complete API documentation
+
+## Examples
+
+The `examples/` folder has working examples:
+
+- `01_basic_melodies.py` - Simple note and melody creation
+- `02_filters_and_effects.py` - Using filters and effects
+- `03_video_visualizations.py` - Creating video from audio
+- `04_generative_music.py` - Algorithmic composition
+- `05_export_formats.py` - Exporting to different formats
+
+Run any example:
 
 ```bash
-pip install algorythm
+python examples/01_basic_melodies.py
 ```
-Optional dependencies for playback and GUI can be installed with:
-```bash
-pip install algorythm[playback]
-pip install algorythm[gui]
-pip install algorythm[all]
-```
+
+## Requirements
+
+- Python 3.7+
+- NumPy
+- PyDub (for MP3/format conversion)
+- PyYAML
+
+Optional for video:
+- moviepy
+- Pillow
+
+Optional for playback:
+- sounddevice
+
+## License
+
+See LICENSE file.
+
+## Contributing
+
+This is a personal project but if you want to contribute, feel free to open an issue or PR.

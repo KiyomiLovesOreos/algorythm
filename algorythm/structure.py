@@ -1176,14 +1176,179 @@ class Composition:
         renderer.render_frames(audio, visualizer, output_path=file_path)
 
 
+class CompositionSet:
+    """
+    Sequential composition player that chains multiple compositions.
+
+    Allows compositions to play one after another in order, with optional
+    crossfades and transitions between them.
+    """
+
+    def __init__(self, sample_rate: int = 44100):
+        """
+        Initialize a composition set.
+
+        Args:
+            sample_rate: Sample rate in Hz
+        """
+        self.sample_rate = sample_rate
+        self.compositions: List[Composition] = []
+        self.crossfade_duration: float = 0.0
+        self.transition_effects: List[Any] = []
+
+    def add_composition(self, composition: Composition) -> 'CompositionSet':
+        """
+        Add a composition to the set.
+
+        Args:
+            composition: Composition to add
+
+        Returns:
+            Self for method chaining
+        """
+        self.compositions.append(composition)
+        return self
+
+    def set_crossfade(self, duration: float) -> 'CompositionSet':
+        """
+        Set crossfade duration between compositions.
+
+        Args:
+            duration: Crossfade duration in seconds
+
+        Returns:
+            Self for method chaining
+        """
+        self.crossfade_duration = duration
+        return self
+
+    def add_transition_effect(self, effect: Any) -> 'CompositionSet':
+        """
+        Add an effect to apply during transitions.
+
+        Args:
+            effect: Effect to apply
+
+        Returns:
+            Self for method chaining
+        """
+        self.transition_effects.append(effect)
+        return self
+
+    def render(
+        self,
+        file_path: Optional[str] = None,
+        quality: str = 'high'
+    ) -> np.ndarray:
+        """
+        Render all compositions sequentially.
+
+        Args:
+            file_path: Output file path
+            quality: Quality setting
+
+        Returns:
+            Rendered audio signal
+        """
+        if not self.compositions:
+            return np.array([])
+
+        # Render each composition
+        rendered_compositions = []
+        for comp in self.compositions:
+            audio = comp.render()
+            rendered_compositions.append(audio)
+
+        if len(rendered_compositions) == 1:
+            output = rendered_compositions[0]
+        else:
+            # Concatenate with crossfades
+            output = self._concatenate_with_crossfade(rendered_compositions)
+
+        # Export if file path provided
+        if file_path:
+            from algorythm.export import Exporter
+            exporter = Exporter()
+            exporter.export(output, file_path, self.sample_rate, quality)
+
+        return output
+
+    def _concatenate_with_crossfade(self, audio_segments: List[np.ndarray]) -> np.ndarray:
+        """
+        Concatenate audio segments with crossfades.
+
+        Args:
+            audio_segments: List of audio arrays
+
+        Returns:
+            Concatenated audio
+        """
+        if self.crossfade_duration == 0:
+            # Simple concatenation
+            return np.concatenate(audio_segments)
+
+        crossfade_samples = int(self.crossfade_duration * self.sample_rate)
+
+        # Start with first segment
+        result = audio_segments[0].copy()
+
+        for i in range(1, len(audio_segments)):
+            current_segment = audio_segments[i]
+
+            if crossfade_samples > 0 and len(result) >= crossfade_samples:
+                # Apply crossfade
+                overlap_start = len(result) - crossfade_samples
+                overlap_end = len(result)
+
+                # Create fade curves
+                fade_out = np.linspace(1, 0, crossfade_samples)
+                fade_in = np.linspace(0, 1, crossfade_samples)
+
+                # Apply transition effects if any
+                transition_segment = current_segment[:crossfade_samples].copy()
+                if self.transition_effects:
+                    for effect in self.transition_effects:
+                        transition_segment = effect.apply(transition_segment, self.sample_rate)
+
+                # Mix the overlapping region
+                result[overlap_start:overlap_end] = (
+                    result[overlap_start:overlap_end] * fade_out +
+                    transition_segment * fade_in
+                )
+
+                # Append the rest
+                result = np.concatenate([result, current_segment[crossfade_samples:]])
+            else:
+                # No crossfade, just append
+                result = np.concatenate([result, current_segment])
+
+        return result
+
+    def play(self, blocking: bool = False):
+        """
+        Play the composition set in real-time.
+
+        Args:
+            blocking: If True, wait for playback to complete
+        """
+        from algorythm.playback import AudioPlayer
+
+        audio = self.render()
+        player = AudioPlayer(sample_rate=self.sample_rate)
+        player.play(audio, blocking=blocking)
+
+        if blocking:
+            player.close()
+
+
 class VolumeControl:
     """
     Utility class for volume control and conversions.
-    
+
     Provides methods for converting between different volume representations
     and applying volume changes to audio signals.
     """
-    
+
     @staticmethod
     def db_to_linear(db: float) -> float:
         """

@@ -1,6 +1,6 @@
 LICENSE
 README.md
-setup.py
+pyproject.toml
 algorythm/__init__.py
 algorythm/audio_loader.py
 algorythm/automation.py
@@ -10,13 +10,11 @@ algorythm/cli_tools.py
 algorythm/effects.py
 algorythm/export.py
 algorythm/generative.py
-algorythm/live_gui.py
 algorythm/playback.py
 algorythm/sampler.py
 algorythm/sequence.py
 algorythm/structure.py
 algorythm/synth.py
-algorythm/terminal_daw.py
 algorythm/visualization.py
 algorythm.egg-info/PKG-INFO
 algorythm.egg-info/SOURCES.txt

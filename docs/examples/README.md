@@ -4,7 +4,7 @@ Welcome to the Algorythm examples! These scripts demonstrate various features an
 
 ## Quick Start Examples (Numbered)
 
-1. **01_basic_melodies.py** - Start here! ⭐
+1. **01_basic_melodies.py** - Start here!
    - Simple tones and melodies
    - Different waveforms (sine, square, saw, triangle)
    - Classic songs (Twinkle Twinkle)
@@ -33,7 +33,7 @@ Welcome to the Algorythm examples! These scripts demonstrate various features an
    - Custom locations
    - Quality settings
 
-6. **06_visualize_audio_files.py** - Load existing audio ⭐ NEW
+6. **06_visualize_audio_files.py** - Load existing audio
    - Load MP3, WAV, OGG, FLAC files
    - Apply visualizations to your music
    - Partial loading (offset/duration)

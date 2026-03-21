@@ -575,35 +575,405 @@ class RingModulator(Effect):
         return signal * (1 - self.mix) + wet * self.mix
 
 
+class Stutter(Effect):
+    """
+    Stutter/repeat effect for rhythmic glitching.
+
+    Repeats small segments of audio at regular intervals.
+    """
+
+    def __init__(
+        self,
+        segment_duration: float = 0.125,
+        repeat_count: int = 4,
+        interval: float = 0.5,
+        mix: float = 1.0
+    ):
+        """
+        Initialize stutter effect.
+
+        Args:
+            segment_duration: Duration of segment to repeat in seconds
+            repeat_count: Number of times to repeat the segment
+            interval: Interval between stutters in seconds
+            mix: Mix of stuttered signal (0.0 to 1.0)
+        """
+        self.segment_duration = segment_duration
+        self.repeat_count = repeat_count
+        self.interval = interval
+        self.mix = mix
+
+    def apply(self, signal: np.ndarray, sample_rate: int = 44100) -> np.ndarray:
+        segment_samples = int(self.segment_duration * sample_rate)
+        interval_samples = int(self.interval * sample_rate)
+
+        wet = signal.copy()
+        position = 0
+
+        while position + interval_samples < len(wet):
+            # Capture segment
+            segment_start = position + interval_samples
+            segment_end = min(segment_start + segment_samples, len(wet))
+            segment = wet[segment_start:segment_end].copy()
+
+            # Repeat segment
+            for i in range(1, self.repeat_count):
+                repeat_start = segment_start + i * segment_samples
+                repeat_end = min(repeat_start + len(segment), len(wet))
+                if repeat_start < len(wet):
+                    wet[repeat_start:repeat_end] = segment[:repeat_end - repeat_start]
+
+            position += interval_samples + self.repeat_count * segment_samples
+
+        return signal * (1 - self.mix) + wet * self.mix
+
+
+class FilterSweep(Effect):
+    """
+    Filter sweep effect with time-varying cutoff frequency.
+
+    Creates sweeping filter effects using LFO modulation.
+    """
+
+    def __init__(
+        self,
+        filter_type: Literal['lowpass', 'highpass', 'bandpass'] = 'lowpass',
+        start_freq: float = 200.0,
+        end_freq: float = 5000.0,
+        duration: Optional[float] = None,
+        rate: float = 0.5,
+        resonance: float = 1.0,
+        mix: float = 1.0
+    ):
+        """
+        Initialize filter sweep effect.
+
+        Args:
+            filter_type: Type of filter to sweep
+            start_freq: Starting cutoff frequency in Hz
+            end_freq: Ending cutoff frequency in Hz
+            duration: Duration of one sweep cycle in seconds (None = use rate)
+            rate: Sweep rate in Hz (cycles per second, used if duration is None)
+            resonance: Filter resonance (0.0 to 10.0)
+            mix: Mix of filtered signal (0.0 to 1.0)
+        """
+        self.filter_type = filter_type
+        self.start_freq = start_freq
+        self.end_freq = end_freq
+        self.duration = duration
+        self.rate = rate
+        self.resonance = resonance
+        self.mix = mix
+
+    def apply(self, signal: np.ndarray, sample_rate: int = 44100) -> np.ndarray:
+        try:
+            from scipy import signal as scipy_signal
+            has_scipy = True
+        except ImportError:
+            has_scipy = False
+
+        num_samples = len(signal)
+        t = np.arange(num_samples) / sample_rate
+
+        # Create sweep envelope
+        if self.duration:
+            lfo = (t % self.duration) / self.duration
+        else:
+            lfo = (np.sin(2 * np.pi * self.rate * t) + 1) / 2
+
+        # Calculate frequency sweep
+        freqs = self.start_freq + (self.end_freq - self.start_freq) * lfo
+
+        if not has_scipy:
+            # Simple frequency-based filtering without scipy
+            # Use FFT-based filtering as fallback
+            wet = signal.copy()
+            chunk_size = 2048
+
+            for i in range(0, len(signal), chunk_size):
+                chunk_end = min(i + chunk_size, len(signal))
+                chunk = signal[i:chunk_end]
+
+                if len(chunk) < 4:
+                    wet[i:chunk_end] = chunk
+                    continue
+
+                # Use average frequency for this chunk
+                freq = np.mean(freqs[i:chunk_end])
+
+                # FFT-based filtering
+                fft = np.fft.rfft(chunk)
+                fft_freqs = np.fft.rfftfreq(len(chunk), 1/sample_rate)
+
+                if self.filter_type == 'lowpass':
+                    # Attenuate frequencies above cutoff
+                    mask = fft_freqs > freq
+                    fft[mask] *= np.exp(-((fft_freqs[mask] - freq) / (freq * 0.5)) ** 2)
+                elif self.filter_type == 'highpass':
+                    # Attenuate frequencies below cutoff
+                    mask = fft_freqs < freq
+                    fft[mask] *= np.exp(-((freq - fft_freqs[mask]) / (freq * 0.5)) ** 2)
+                elif self.filter_type == 'bandpass':
+                    # Keep frequencies around cutoff
+                    center = freq
+                    bandwidth = freq * 0.4
+                    distances = np.abs(fft_freqs - center)
+                    mask = distances > bandwidth
+                    fft[mask] *= np.exp(-((distances[mask] - bandwidth) / bandwidth) ** 2)
+
+                filtered_chunk = np.fft.irfft(fft, n=len(chunk))
+                wet[i:chunk_end] = filtered_chunk
+
+            return signal * (1 - self.mix) + wet * self.mix
+
+        # Use scipy if available for better quality
+        wet = np.zeros_like(signal)
+        chunk_size = 1024
+
+        for i in range(0, len(signal), chunk_size):
+            chunk_end = min(i + chunk_size, len(signal))
+            chunk = signal[i:chunk_end]
+
+            # Use average frequency for this chunk
+            freq = np.mean(freqs[i:chunk_end])
+            nyquist = sample_rate / 2
+            norm_freq = min(freq / nyquist, 0.99)
+
+            # Design filter for this chunk
+            try:
+                if self.filter_type == 'lowpass':
+                    b, a = scipy_signal.butter(4, norm_freq, btype='low')
+                elif self.filter_type == 'highpass':
+                    b, a = scipy_signal.butter(4, norm_freq, btype='high')
+                elif self.filter_type == 'bandpass':
+                    low = max(norm_freq * 0.8, 0.01)
+                    high = min(norm_freq * 1.2, 0.99)
+                    b, a = scipy_signal.butter(4, [low, high], btype='band')
+
+                # Apply filter
+                filtered_chunk = scipy_signal.lfilter(b, a, chunk)
+                wet[i:chunk_end] = filtered_chunk
+            except:
+                wet[i:chunk_end] = chunk
+
+        return signal * (1 - self.mix) + wet * self.mix
+
+
+class Freeze(Effect):
+    """
+    Freeze effect that captures and holds a moment of audio.
+
+    Creates sustained textures by repeating a small buffer.
+    """
+
+    def __init__(
+        self,
+        freeze_start: float = 0.5,
+        freeze_duration: float = 0.1,
+        hold_duration: float = 2.0,
+        fade_time: float = 0.05,
+        mix: float = 1.0
+    ):
+        """
+        Initialize freeze effect.
+
+        Args:
+            freeze_start: Time position to freeze (0.0 to 1.0 = start to end)
+            freeze_duration: Duration of frozen buffer in seconds
+            hold_duration: How long to hold the frozen buffer in seconds
+            fade_time: Crossfade time in seconds
+            mix: Mix of frozen signal (0.0 to 1.0)
+        """
+        self.freeze_start = freeze_start
+        self.freeze_duration = freeze_duration
+        self.hold_duration = hold_duration
+        self.fade_time = fade_time
+        self.mix = mix
+
+    def apply(self, signal: np.ndarray, sample_rate: int = 44100) -> np.ndarray:
+        # Find freeze position
+        freeze_pos = int(self.freeze_start * len(signal))
+        freeze_samples = int(self.freeze_duration * sample_rate)
+        hold_samples = int(self.hold_duration * sample_rate)
+        fade_samples = int(self.fade_time * sample_rate)
+
+        # Extract freeze buffer
+        freeze_start = min(freeze_pos, len(signal) - freeze_samples)
+        freeze_end = freeze_start + freeze_samples
+        freeze_buffer = signal[freeze_start:freeze_end].copy()
+
+        if len(freeze_buffer) == 0:
+            return signal
+
+        # Create output
+        wet = signal.copy()
+
+        # Repeat freeze buffer for hold duration
+        current_pos = freeze_start
+        while current_pos < len(wet) and current_pos < freeze_start + hold_samples:
+            # Loop through freeze buffer
+            for i in range(len(freeze_buffer)):
+                if current_pos >= len(wet):
+                    break
+
+                # Crossfade at loop boundaries
+                fade_in = min(i / fade_samples, 1.0) if i < fade_samples else 1.0
+                fade_out = min((len(freeze_buffer) - i) / fade_samples, 1.0) if i > len(freeze_buffer) - fade_samples else 1.0
+                fade = min(fade_in, fade_out)
+
+                wet[current_pos] = freeze_buffer[i] * fade + wet[current_pos] * (1 - fade)
+                current_pos += 1
+
+        return signal * (1 - self.mix) + wet * self.mix
+
+
+class Reverse(Effect):
+    """
+    Reverse effect that reverses segments of audio.
+
+    Can reverse the entire signal or create rhythmic reverse effects.
+    """
+
+    def __init__(
+        self,
+        segment_duration: Optional[float] = None,
+        reverse_probability: float = 1.0,
+        mix: float = 1.0
+    ):
+        """
+        Initialize reverse effect.
+
+        Args:
+            segment_duration: Duration of segments to reverse in seconds (None = reverse all)
+            reverse_probability: Probability of reversing each segment (0.0 to 1.0)
+            mix: Mix of reversed signal (0.0 to 1.0)
+        """
+        self.segment_duration = segment_duration
+        self.reverse_probability = reverse_probability
+        self.mix = mix
+
+    def apply(self, signal: np.ndarray, sample_rate: int = 44100) -> np.ndarray:
+        if self.segment_duration is None:
+            # Reverse entire signal
+            wet = signal[::-1].copy()
+        else:
+            # Reverse segments
+            segment_samples = int(self.segment_duration * sample_rate)
+            wet = signal.copy()
+
+            for i in range(0, len(wet), segment_samples):
+                if np.random.random() < self.reverse_probability:
+                    segment_end = min(i + segment_samples, len(wet))
+                    wet[i:segment_end] = wet[i:segment_end][::-1]
+
+        return signal * (1 - self.mix) + wet * self.mix
+
+
+class BeatRepeat(Effect):
+    """
+    Beat repeat effect for rhythmic repetition and glitching.
+
+    Captures and repeats beats at musical intervals with variations.
+    """
+
+    def __init__(
+        self,
+        tempo: float = 120.0,
+        beat_division: float = 0.25,
+        repeat_count: int = 4,
+        gate: float = 1.0,
+        pitch_shift: float = 0.0,
+        decay: float = 0.9,
+        mix: float = 1.0
+    ):
+        """
+        Initialize beat repeat effect.
+
+        Args:
+            tempo: Tempo in BPM for beat synchronization
+            beat_division: Beat division (0.25 = 16th, 0.5 = 8th, 1.0 = quarter)
+            repeat_count: Number of repetitions
+            gate: Gate/volume envelope for repeats (0.0 to 1.0)
+            pitch_shift: Pitch shift in semitones for repeats
+            decay: Volume decay for each repeat (0.0 to 1.0)
+            mix: Mix of repeated signal (0.0 to 1.0)
+        """
+        self.tempo = tempo
+        self.beat_division = beat_division
+        self.repeat_count = repeat_count
+        self.gate = gate
+        self.pitch_shift = pitch_shift
+        self.decay = decay
+        self.mix = mix
+
+    def apply(self, signal: np.ndarray, sample_rate: int = 44100) -> np.ndarray:
+        # Calculate beat duration
+        beat_duration = 60.0 / self.tempo * self.beat_division
+        beat_samples = int(beat_duration * sample_rate)
+
+        wet = signal.copy()
+
+        # Process in beat-sized chunks
+        for i in range(0, len(signal), beat_samples * (self.repeat_count + 1)):
+            # Capture beat
+            beat_end = min(i + beat_samples, len(signal))
+            beat = signal[i:beat_end].copy()
+
+            if len(beat) == 0:
+                break
+
+            # Apply pitch shift if specified
+            if self.pitch_shift != 0.0:
+                pitch_ratio = 2.0 ** (self.pitch_shift / 12.0)
+                indices = np.arange(len(beat)) / pitch_ratio
+                indices = np.clip(indices, 0, len(beat) - 1).astype(int)
+                beat = beat[indices]
+
+            # Repeat beat with decay
+            for r in range(1, self.repeat_count + 1):
+                repeat_start = i + r * beat_samples
+                repeat_end = min(repeat_start + len(beat), len(wet))
+
+                if repeat_start >= len(wet):
+                    break
+
+                # Apply decay and gate
+                volume = (self.decay ** r) * self.gate
+                repeat_length = repeat_end - repeat_start
+                wet[repeat_start:repeat_end] = beat[:repeat_length] * volume + wet[repeat_start:repeat_end] * (1 - volume)
+
+        return signal * (1 - self.mix) + wet * self.mix
+
+
 class EffectChain:
     """
     Chain multiple effects together for complex signal processing.
     """
-    
+
     def __init__(self):
         self.effects = []
-    
+
     def add_effect(self, effect: Effect) -> 'EffectChain':
         """
         Add an effect to the chain.
-        
+
         Args:
             effect: Effect instance to add
-            
+
         Returns:
             Self for method chaining
         """
         self.effects.append(effect)
         return self
-    
+
     def apply(self, signal: np.ndarray, sample_rate: int = 44100) -> np.ndarray:
         """
         Apply all effects in the chain sequentially.
-        
+
         Args:
             signal: Input audio signal
             sample_rate: Sample rate in Hz
-            
+
         Returns:
             Processed audio signal
         """
@@ -611,7 +981,7 @@ class EffectChain:
         for effect in self.effects:
             output = effect.apply(output, sample_rate)
         return output
-    
+
     def clear(self) -> 'EffectChain':
         """Clear all effects from the chain."""
         self.effects = []
